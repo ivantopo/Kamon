@@ -31,22 +31,12 @@ object Dependencies {
   val play24Version     = "2.4.6"
   val elasticsearchVersion = "2.1.0"
 
-  val sprayJson         = "io.spray"                  %%  "spray-json"            % "1.3.1"
-  val sprayJsonLenses   = "net.virtual-void"          %%  "json-lenses"           % "0.6.0"
   val scalatest         = "org.scalatest"             %%  "scalatest"             % "2.2.4"
   val logback           = "ch.qos.logback"            %   "logback-classic"       % "1.0.13"
   val aspectJ           = "org.aspectj"               %   "aspectjweaver"         % aspectjVersion
-  val newrelic          = "com.newrelic.agent.java"   %   "newrelic-agent"        % "3.26.1"
   val hdrHistogram      = "org.hdrhistogram"          %   "HdrHistogram"          % "2.1.8"
-  val sprayCan          = "io.spray"                  %%  "spray-can"             % sprayVersion
-  val sprayRouting      = "io.spray"                  %%  "spray-routing"         % sprayVersion
-  val sprayTestkit      = "io.spray"                  %%  "spray-testkit"         % sprayVersion
-  val sprayClient       = "io.spray"                  %%  "spray-client"          % sprayVersion
   val akkaActor         = "com.typesafe.akka"         %%  "akka-actor"            % akkaVersion
   val akkaSlf4j         = "com.typesafe.akka"         %%  "akka-slf4j"            % akkaVersion
-  val akkaTestKit       = "com.typesafe.akka"         %%  "akka-testkit"          % akkaVersion
-  val akkaRemote        = "com.typesafe.akka"         %%  "akka-remote"           % akkaVersion
-  val akkaCluster       = "com.typesafe.akka"         %%  "akka-cluster"          % akkaVersion
   val slf4jApi          = "org.slf4j"                 %   "slf4j-api"             % slf4jVersion
   val slf4jnop          = "org.slf4j"                 %   "slf4j-nop"             % slf4jVersion
   val slf4jJul          = "org.slf4j"                 %   "jul-to-slf4j"          % slf4jVersion
