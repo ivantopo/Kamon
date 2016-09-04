@@ -17,6 +17,7 @@ package kamon.autoweave.loader
 
 import java.io.{ File, FileOutputStream, InputStream }
 import java.lang.management.ManagementFactory
+import java.nio.file.{ Files, FileSystem }
 import java.util.jar.Attributes.Name
 import java.util.jar.{ JarEntry, JarOutputStream, Manifest }
 
@@ -59,6 +60,29 @@ object AgentLoader {
    * @return Returns a temporary jar file with the specified classes included.
    */
   private def generateAgentJar(agent: Class[_], resources: Seq[Class[_]]): File = {
+    println("WEAVING THE SHIT OUT OF THIS")
+
+    val agentJarFile = File.createTempFile("agent", ".jar")
+    println("File is: " + agentJarFile)
+    val agentResource = getClass.getResourceAsStream("/aspectjweaver-1.8.9.jar")
+
+    val writeBuffer = Array.ofDim[Byte](4096)
+    val aos = new FileOutputStream(agentJarFile)
+
+    var read = agentResource.read(writeBuffer)
+    while (read > 0) {
+      aos.write(writeBuffer, 0, read)
+      read = agentResource.read(writeBuffer)
+    }
+
+    println("File is: " + agentJarFile)
+
+    aos.flush()
+    aos.close()
+    //agentJarFile.deleteOnExit()
+    agentJarFile
+
+    /*
     val jarFile = File.createTempFile("agent", ".jar")
     jarFile.deleteOnExit()
 
@@ -86,7 +110,7 @@ object AgentLoader {
     }
 
     jos.close()
-    jarFile
+    jarFile*/
   }
 
   /**
