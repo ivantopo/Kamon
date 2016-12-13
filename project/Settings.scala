@@ -24,11 +24,11 @@ import scalariform.formatter.preferences._
 object Settings {
 
   val JavaVersion = "1.7"
-  val SVersion = "2.11.8"
+  val SVersion = "2.12.1"
 
   lazy val basicSettings = Seq(
     scalaVersion                    := SVersion,
-    crossScalaVersions              := Seq("2.10.5", SVersion),
+    crossScalaVersions              := Seq("2.10.5", "2.11.8", "2.12.1"),
     resolvers                       ++= Dependencies.resolutionRepos,
     fork in run                     := true,
     parallelExecution in Global     := false,

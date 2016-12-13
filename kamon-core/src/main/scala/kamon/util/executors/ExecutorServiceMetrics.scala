@@ -16,119 +16,85 @@
 
 package kamon.util.executors
 
-import java.util.concurrent.{ExecutorService, ForkJoinPool ⇒ JavaForkJoinPool, ThreadPoolExecutor}
-
-import kamon.Kamon
-import kamon.metric.Entity
+import kamon.metric.{EntityRecorderFactory, GenericEntityRecorder}
+import kamon.metric.instrument.{Gauge, MinMaxCounter, DifferentialValueCollector, InstrumentFactory}
+import java.util.concurrent.{ForkJoinPool ⇒ JavaForkJoinPool, ThreadPoolExecutor}
+import kamon.util.executors.ForkJoinPools.ForkJoinMetrics
 
 import scala.concurrent.forkjoin.ForkJoinPool
-import scala.util.control.NoStackTrace
 
-object ExecutorServiceMetrics {
-  val Category = "executor-service"
-
-  private val DelegatedExecutor = Class.forName("java.util.concurrent.Executors$DelegatedExecutorService")
-  private val FinalizableDelegated = Class.forName("java.util.concurrent.Executors$FinalizableDelegatedExecutorService")
-  private val DelegateScheduled = Class.forName("java.util.concurrent.Executors$DelegatedScheduledExecutorService")
-  private val JavaForkJoinPool = classOf[JavaForkJoinPool]
-  private val ScalaForkJoinPool = classOf[ForkJoinPool]
-
-  private val executorField = {
-    // executorService is private :(
-    val field = DelegatedExecutor.getDeclaredField("e")
-    field.setAccessible(true)
-    field
+object ForkJoinPools extends ForkJoinPoolsImplicitsLowPrio {
+  trait ForkJoinMetrics[T] {
+    def getParallelism(fjp: T): Long
+    def getPoolSize(fjp: T): Long
+    def getActiveThreadCount(fjp: T): Long
+    def getRunningThreadCount(fjp: T): Long
+    def getQueuedTaskCount(fjp: T): Long
+    def getQueuedSubmissionCount(fjp: T): Long
   }
 
-  /**
-   *
-   * Register the [[http://docs.oracle.com/javase/7/docs/api/java/util/concurrent/ThreadPoolExecutor.html ThreadPoolExecutor]] to Monitor.
-   *
-   * @param name The name of the [[ThreadPoolExecutor]]
-   * @param threadPool The intance of the [[ThreadPoolExecutor]]
-   * @param tags The tags associated to the [[ThreadPoolExecutor]]
-   */
-  @inline private def registerThreadPool(name: String, threadPool: ThreadPoolExecutor, tags: Map[String, String]): Entity = {
-    val threadPoolEntity = Entity(name, Category, tags + ("executor-type" → "thread-pool-executor"))
-    Kamon.metrics.entity(ThreadPoolExecutorMetrics.factory(threadPool, Category), threadPoolEntity)
-    threadPoolEntity
+  implicit object JavaForkJoin extends ForkJoinMetrics[JavaForkJoinPool] {
+    def getParallelism(fjp: JavaForkJoinPool) = fjp.getParallelism
+    def getPoolSize(fjp: JavaForkJoinPool) = fjp.getPoolSize.toLong
+    def getRunningThreadCount(fjp: JavaForkJoinPool) = fjp.getActiveThreadCount.toLong
+    def getActiveThreadCount(fjp: JavaForkJoinPool) = fjp.getRunningThreadCount.toLong
+    def getQueuedTaskCount(fjp: JavaForkJoinPool) = fjp.getQueuedTaskCount
+    def getQueuedSubmissionCount(fjp: JavaForkJoinPool) = fjp.getQueuedSubmissionCount
+
   }
+}
 
-  /**
-   *
-   * Register the [[http://www.scala-lang.org/api/current/index.html#scala.collection.parallel.TaskSupport ForkJoinPool]] to Monitor.
-   *
-   * @param name The name of the [[ForkJoinPool]]
-   * @param forkJoinPool The instance of the [[ForkJoinPool]]
-   * @param tags The tags associated to the [[ForkJoinPool]]
-   */
-  @inline private def registerScalaForkJoin(name: String, forkJoinPool: ForkJoinPool, tags: Map[String, String]): Entity = {
-    val forkJoinEntity = Entity(name, Category, tags + ("executor-type" → "fork-join-pool"))
-    Kamon.metrics.entity(ForkJoinPoolMetrics.factory(forkJoinPool, Category), forkJoinEntity)
-    forkJoinEntity
+trait ForkJoinPoolsImplicitsLowPrio {
+  implicit object ScalaForkJoin extends ForkJoinMetrics[ForkJoinPool] {
+    def getParallelism(fjp: ForkJoinPool) = fjp.getParallelism
+    def getPoolSize(fjp: ForkJoinPool) = fjp.getPoolSize.toLong
+    def getRunningThreadCount(fjp: ForkJoinPool) = fjp.getActiveThreadCount.toLong
+    def getActiveThreadCount(fjp: ForkJoinPool) = fjp.getRunningThreadCount.toLong
+    def getQueuedTaskCount(fjp: ForkJoinPool) = fjp.getQueuedTaskCount
+    def getQueuedSubmissionCount(fjp: ForkJoinPool) = fjp.getQueuedSubmissionCount
   }
+}
 
-  /**
-   *
-   * Register the [[https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ForkJoinPool.html JavaForkJoinPool]] to Monitor.
-   *
-   * @param name The name of the [[JavaForkJoinPool]]
-   * @param forkJoinPool The instance of the [[JavaForkJoinPool]]
-   * @param tags The tags associated to the [[JavaForkJoinPool]]
-   */
-  @inline private def registerJavaForkJoin(name: String, forkJoinPool: JavaForkJoinPool, tags: Map[String, String]): Entity = {
-    val forkJoinEntity = Entity(name, Category, tags + ("executor-type" → "fork-join-pool"))
-    Kamon.metrics.entity(ForkJoinPoolMetrics.factory(forkJoinPool, Category), forkJoinEntity)
-    forkJoinEntity
-  }
+abstract class ForkJoinPoolMetrics(instrumentFactory: InstrumentFactory) extends GenericEntityRecorder(instrumentFactory) {
+  def paralellism: MinMaxCounter
+  def poolSize: Gauge
+  def activeThreads: Gauge
+  def runningThreads: Gauge
+  def queuedTaskCount: Gauge
+  def queuedSubmissionCount: Gauge
+}
 
-  /**
-   *
-   * Register the [[https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html ExecutorService]] to Monitor.
-   *
-   * @param name The name of the [[ExecutorService]]
-   * @param executorService The instance of the [[ExecutorService]]
-   * @param tags The tags associated to the [[ExecutorService]]
-   */
-  def register(name: String, executorService: ExecutorService, tags: Map[String, String]): Entity = executorService match {
-    case threadPoolExecutor: ThreadPoolExecutor ⇒ registerThreadPool(name, threadPoolExecutor, tags)
-    case scalaForkJoinPool: ForkJoinPool if scalaForkJoinPool.getClass.isAssignableFrom(ScalaForkJoinPool) ⇒ registerScalaForkJoin(name, scalaForkJoinPool, tags)
-    case javaForkJoinPool: JavaForkJoinPool if javaForkJoinPool.getClass.isAssignableFrom(JavaForkJoinPool) ⇒ registerJavaForkJoin(name, javaForkJoinPool, tags)
-    case delegatedExecutor: ExecutorService if delegatedExecutor.getClass.isAssignableFrom(DelegatedExecutor) ⇒ registerDelegatedExecutor(name, delegatedExecutor, tags)
-    case delegatedScheduledExecutor: ExecutorService if delegatedScheduledExecutor.getClass.isAssignableFrom(DelegateScheduled) ⇒ registerDelegatedExecutor(name, delegatedScheduledExecutor, tags)
-    case finalizableDelegatedExecutor: ExecutorService if finalizableDelegatedExecutor.getClass.isAssignableFrom(FinalizableDelegated) ⇒ registerDelegatedExecutor(name, finalizableDelegatedExecutor, tags)
-    case other ⇒ throw NotSupportedException(s"The ExecutorService $name is not supported.")
-  }
+object ForkJoinPoolMetrics {
+  def factory[T: ForkJoinMetrics](fjp: T, categoryName: String) = new EntityRecorderFactory[ForkJoinPoolMetrics] {
+    val forkJoinMetrics = implicitly[ForkJoinMetrics[T]]
 
-  //Java variant
-  def register(name: String, executorService: ExecutorService, tags: java.util.Map[String, String]): Entity = {
-    import scala.collection.JavaConverters._
-    register(name, executorService, tags.asScala.toMap)
-  }
+    def category: String = categoryName
+    def createRecorder(instrumentFactory: InstrumentFactory) = new ForkJoinPoolMetrics(instrumentFactory) {
+      val paralellism = minMaxCounter("parallelism")
+      paralellism.increment(forkJoinMetrics.getParallelism(fjp)) // Steady value.
 
-  /**
-   *
-   * Register the [[https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html ExecutorService]] to Monitor.
-   *
-   * @param name The name of the [[ExecutorService]]
-   * @param executorService The instance of the [[ExecutorService]]
-   */
-  def register(name: String, executorService: ExecutorService): Entity = {
-    register(name, executorService, Map.empty[String, String])
-  }
-
-  def remove(entity: Entity): Unit = Kamon.metrics.removeEntity(entity)
-
-  /**
-   * INTERNAL USAGE ONLY
-   */
-  private def registerDelegatedExecutor(name: String, executor: ExecutorService, tags: Map[String, String]) = {
-    val underlyingExecutor = executorField.get(executor) match {
-      case executorService: ExecutorService ⇒ executorService
-      case other                            ⇒ other
+      val poolSize = gauge("pool-size", forkJoinMetrics.getPoolSize(fjp))
+      val activeThreads = gauge("active-threads", forkJoinMetrics.getActiveThreadCount(fjp))
+      val runningThreads = gauge("running-threads", forkJoinMetrics.getRunningThreadCount(fjp))
+      val queuedTaskCount = gauge("queued-task-count", forkJoinMetrics.getQueuedTaskCount(fjp))
+      val queuedSubmissionCount = gauge("queued-submission-count", forkJoinMetrics.getQueuedSubmissionCount(fjp))
     }
-    register(name, underlyingExecutor.asInstanceOf[ExecutorService], tags)
   }
+}
 
-  case class NotSupportedException(message: String) extends RuntimeException with NoStackTrace
+class ThreadPoolExecutorMetrics(tpe: ThreadPoolExecutor, instrumentFactory: InstrumentFactory) extends GenericEntityRecorder(instrumentFactory) {
+  val corePoolSize = gauge("core-pool-size", tpe.getCorePoolSize.toLong)
+  val maxPoolSize = gauge("max-pool-size", tpe.getMaximumPoolSize.toLong)
+  val poolSize = gauge("pool-size", tpe.getPoolSize.toLong)
+  val activeThreads = gauge("active-threads", tpe.getActiveCount.toLong)
+  val processedTasks = gauge("processed-tasks", DifferentialValueCollector(() ⇒ {
+    tpe.getTaskCount
+  }))
+}
+
+object ThreadPoolExecutorMetrics {
+  def factory(tpe: ThreadPoolExecutor, cat: String) = new EntityRecorderFactory[ThreadPoolExecutorMetrics] {
+    def category: String = cat
+    def createRecorder(instrumentFactory: InstrumentFactory) = new ThreadPoolExecutorMetrics(tpe, instrumentFactory)
+  }
 }

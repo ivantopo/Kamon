@@ -30,10 +30,10 @@ lazy val core = (project in file("kamon-core"))
   .settings(formatSettings: _*)
   .settings(
         libraryDependencies ++=
-          compileScope(akkaActor, hdrHistogram, slf4jApi) ++
+          compileScope(akkaDependency("actor").value, hdrHistogram, slf4jApi) ++
           providedScope(aspectJ) ++
           optionalScope(logback) ++
-           testScope(scalatest, akkaTestKit, akkaSlf4j, logback))
+          testScope(scalatest, akkaDependency("testkit").value, akkaDependency("slf4j").value, logback))
 
 
 lazy val autoweave = (project in file("kamon-autoweave"))
@@ -52,7 +52,7 @@ lazy val testkit = (project in file("kamon-testkit"))
   .settings(formatSettings: _*)
   .settings(
         libraryDependencies ++=
-          compileScope(akkaActor, akkaTestKit) ++
+          compileScope(akkaActor, akkaDependency("testkit").value) ++
           providedScope(aspectJ) ++
           testScope(slf4jApi, slf4jnop))
 
