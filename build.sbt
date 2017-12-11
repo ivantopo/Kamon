@@ -22,6 +22,7 @@ lazy val kamon = (project in file("."))
 val commonSettings = Seq(
   scalaVersion := "2.11.8",
   javacOptions += "-XDignore.symbol.file",
+  scalacOptions += "-optimise",
   resolvers += Resolver.mavenLocal,
   crossScalaVersions := Seq("2.12.2", "2.11.8", "2.10.6"),
   concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
@@ -50,9 +51,21 @@ lazy val testkit = (project in file("kamon-testkit"))
 
 
 lazy val coreTests = (project in file("kamon-core-tests"))
-  .settings(moduleName := "kamon-core-tests", resolvers += Resolver.mavenLocal)
+  .settings(moduleName := "kamon-core-tests")
   .settings(noPublishing: _*)
   .settings(commonSettings: _*)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "ch.qos.logback" % "logback-classic" % "1.2.2" % "test"
+    )
+  ).dependsOn(testkit)
+
+lazy val coreBenchmarks = (project in file("kamon-core-benchmarks"))
+  .settings(moduleName := "kamon-core-tests")
+  .settings(noPublishing: _*)
+  .settings(commonSettings: _*)
+  .enablePlugins(JmhPlugin)
   .settings(
     libraryDependencies ++= Seq(
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",

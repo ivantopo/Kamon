@@ -21,7 +21,7 @@ object Clock {
   private val startMicroTime = startTimeMillis * 1000L
 
   def microTimestamp(): Long =
-    startMicroTime + ((System.nanoTime() - startNanoTime) / 1000L)
+    System.nanoTime() //startMicroTime + ((System.nanoTime() - startNanoTime) / 1000L)
 
   def milliTimestamp(): Long =
     System.currentTimeMillis()
