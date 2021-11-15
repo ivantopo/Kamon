@@ -711,6 +711,48 @@ lazy val `kamon-prometheus` = (project in file("reporters/kamon-prometheus"))
   ).dependsOn(`kamon-core`, `kamon-testkit` % "test")
 
 
+/**
+  * Compatibility
+  */
+
+lazy val compatibility = (project in file("compatibility"))
+  .disablePlugins(AssemblyPlugin)
+  .settings(noPublishing: _*)
+  .settings(crossScalaVersions := Nil)
+  .aggregate(
+    `micrometer-registry-kamon`,
+    `kamon-apm-spring-boot-autoconfigure`,
+    `kamon-apm-spring-boot-starter`
+  )
+
+lazy val `micrometer-registry-kamon` = (project in file("compatibility/micrometer-registry-kamon"))
+  .disablePlugins(AssemblyPlugin)
+  .settings(
+    crossScalaVersions += scala3Version,
+    libraryDependencies ++= Seq(
+      "io.micrometer" % "micrometer-core" % "1.7.5"
+    )
+  ).dependsOn(`kamon-core`, `kamon-testkit` % "test")
+
+lazy val `kamon-apm-spring-boot-autoconfigure` = (project in file("compatibility/kamon-apm-spring-boot-autoconfigure"))
+  .disablePlugins(AssemblyPlugin)
+  .settings(
+    crossScalaVersions += scala3Version,
+    libraryDependencies ++= Seq(
+      "org.springframework.boot" % "spring-boot-starter-actuator" % "2.5.6" % "provided"
+    )
+  ).dependsOn(`micrometer-registry-kamon` % "provided")
+
+lazy val `kamon-apm-spring-boot-starter` = (project in file("compatibility/kamon-apm-spring-boot-starter"))
+  .disablePlugins(AssemblyPlugin)
+  .settings(
+    crossScalaVersions += scala3Version,
+  ).dependsOn(`micrometer-registry-kamon`, `kamon-apm-spring-boot-autoconfigure`, `kamon-apm-reporter`)
+
+
+/**
+  * Bundle
+  */
 lazy val bundle = (project in file("bundle"))
   .disablePlugins(AssemblyPlugin)
   .settings(noPublishing: _*)
