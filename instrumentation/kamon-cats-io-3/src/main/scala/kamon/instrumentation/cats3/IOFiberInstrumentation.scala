@@ -47,8 +47,8 @@ class IOFiberInstrumentation extends InstrumentationBuilder {
 object AfterFiberInit {
 
   @Advice.OnMethodExit
-  def exit(@Advice.This fiber: HasContext): Unit ={
-    fiber.setContext(Kamon.currentContext())
+  def exit(@Advice.This fiber: Any): Unit ={
+    fiber.asInstanceOf[HasContext].setContext(Kamon.currentContext())
   }
 }
 
