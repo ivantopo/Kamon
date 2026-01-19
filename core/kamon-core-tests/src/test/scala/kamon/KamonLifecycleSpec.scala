@@ -4,51 +4,51 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import com.typesafe.config.{Config, ConfigFactory}
 import kamon.metric.PeriodSnapshot
+import kamon.testkit.munit.Eventually
 import kamon.trace.Span
-import org.scalatest.concurrent.Eventually
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.SpanSugar._
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
-class KamonLifecycleSpec extends AnyWordSpec with Matchers with Eventually {
+class KamonLifecycleSuite extends FunSuite with Eventually {
 
-  "the Kamon lifecycle" should {
-    "keep the JVM running if modules are running" in {
-      val process = Runtime.getRuntime.exec(createProcessCommand("kamon.KamonWithRunningReporter"))
+  test("keep the JVM running if modules are running") {
+    val process = Runtime.getRuntime.exec(createProcessCommand("kamon.KamonWithRunningReporter"))
+    try {
       Thread.sleep(5000)
-      process.isAlive shouldBe true
+      assert(process.isAlive)
+    } finally {
       process.destroyForcibly().waitFor(5, TimeUnit.SECONDS)
     }
+  }
 
-    "let the JVM stop after all modules are stopped" in {
-      val process = Runtime.getRuntime.exec(createProcessCommand("kamon.KamonWithTemporaryReporter"))
-      Thread.sleep(2000)
-      process.isAlive shouldBe true
+  test("let the JVM stop after all modules are stopped") {
+    val process = Runtime.getRuntime.exec(createProcessCommand("kamon.KamonWithTemporaryReporter"))
+    Thread.sleep(2000)
+    assert(process.isAlive)
 
-      eventually(timeout(7 seconds)) {
-        process.isAlive shouldBe false
-        process.exitValue() shouldBe 0
-      }
+    eventually(timeout = 7.seconds) {
+      assert(!process.isAlive)
+      assertEquals(process.exitValue(), 0)
     }
+  }
 
-    "not create any threads if Kamon.init was not called" in {
-      val process = Runtime.getRuntime.exec(createProcessCommand("kamon.UsingKamonApisWithoutInit"))
+  test("not create any threads if Kamon.init was not called") {
+    val process = Runtime.getRuntime.exec(createProcessCommand("kamon.UsingKamonApisWithoutInit"))
 
-      eventually(timeout(7 seconds)) {
-        process.isAlive shouldBe false
-        process.exitValue() shouldBe 0
-      }
+    eventually(timeout = 7.seconds) {
+      assert(!process.isAlive)
+      assertEquals(process.exitValue(), 0)
     }
+  }
 
-    "process calls to reconfigure before and after being operational" in {
-      val process = Runtime.getRuntime.exec(createProcessCommand("kamon.ReconfiguringBeforeInit"))
+  test("process calls to reconfigure before and after being operational") {
+    val process = Runtime.getRuntime.exec(createProcessCommand("kamon.ReconfiguringBeforeInit"))
 
-      eventually(timeout(7 seconds)) {
-        process.isAlive shouldBe false
-        process.exitValue() shouldBe 0
-      }
+    eventually(timeout = 7.seconds) {
+      assert(!process.isAlive)
+      assertEquals(process.exitValue(), 0)
     }
   }
 
@@ -71,13 +71,13 @@ class DummySpanReporter extends kamon.module.SpanReporter {
 }
 
 object KamonWithRunningReporter extends App {
-  Kamon.registerModule("dummy metric reporter", new DummyMetricReporter())
-  Kamon.registerModule("dummy span reporter", new DummySpanReporter())
+  Kamon.addReporter("dummy metric reporter", new DummyMetricReporter())
+  Kamon.addReporter("dummy span reporter", new DummySpanReporter())
 }
 
 object KamonWithTemporaryReporter extends App {
-  Kamon.registerModule("dummy metric reporter", new DummyMetricReporter())
-  Kamon.registerModule("dummy span reporter", new DummySpanReporter())
+  Kamon.addReporter("dummy metric reporter", new DummyMetricReporter())
+  Kamon.addReporter("dummy span reporter", new DummySpanReporter())
 
   Thread.sleep(5000)
   Kamon.stop()

@@ -40,6 +40,7 @@ object BaseProject extends AutoPlugin {
     val slf4jnop = "org.slf4j" % "slf4j-nop" % "2.0.17"
     val logbackClassic = "ch.qos.logback" % "logback-classic" % "1.3.15"
     val scalatest = "org.scalatest" %% "scalatest" % "3.2.9"
+    val munit = "org.scalameta" %% "munit" % "1.2.1"
     val hdrHistogram = "org.hdrhistogram" % "HdrHistogram" % "2.1.10"
     val okHttp = "com.squareup.okhttp3" % "okhttp" % "4.12.0"
     val okHttpMockServer = "com.squareup.okhttp3" % "mockwebserver" % "4.10.0"

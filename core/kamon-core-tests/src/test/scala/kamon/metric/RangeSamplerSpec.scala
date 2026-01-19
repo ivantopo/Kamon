@@ -17,105 +17,100 @@ package kamon.metric
 
 import java.time.Duration
 import kamon.Kamon
-import kamon.testkit.{InitAndStopKamonAfterAll, InstrumentInspection}
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import kamon.testkit.InstrumentInspection
+import kamon.testkit.munit.InitAndStopKamonAfterAll
+import munit.FunSuite
 
-import scala.concurrent.duration.DurationInt
+class RangeSamplerSuite extends FunSuite with InstrumentInspection.Syntax with InitAndStopKamonAfterAll {
 
-class RangeSamplerSpec extends AnyWordSpec with Matchers with InstrumentInspection.Syntax
-    with InitAndStopKamonAfterAll {
+  test("track ascending tendencies") {
+    val rangeSampler = Kamon.rangeSampler("track-ascending").withoutTags()
+    rangeSampler.increment()
+    rangeSampler.increment(3)
+    rangeSampler.increment()
+    rangeSampler.sample()
 
-  "a RangeSampler" should {
-    "track ascending tendencies" in {
-      val rangeSampler = Kamon.rangeSampler("track-ascending").withoutTags()
-      rangeSampler.increment()
-      rangeSampler.increment(3)
-      rangeSampler.increment()
-      rangeSampler.sample()
+    val snapshot = rangeSampler.distribution()
+    assertEquals(snapshot.min, 0L)
+    assertEquals(snapshot.max, 5L)
+  }
 
-      val snapshot = rangeSampler.distribution()
-      snapshot.min should be(0)
-      snapshot.max should be(5)
-    }
+  test("track descending tendencies") {
+    val rangeSampler = Kamon.rangeSampler("track-descending").withoutTags()
+    rangeSampler.increment(5)
+    rangeSampler.decrement()
+    rangeSampler.decrement(3)
+    rangeSampler.decrement()
+    rangeSampler.sample()
 
-    "track descending tendencies" in {
-      val rangeSampler = Kamon.rangeSampler("track-descending").withoutTags()
-      rangeSampler.increment(5)
-      rangeSampler.decrement()
-      rangeSampler.decrement(3)
-      rangeSampler.decrement()
-      rangeSampler.sample()
+    val snapshot = rangeSampler.distribution()
+    assertEquals(snapshot.min, 0L)
+    assertEquals(snapshot.max, 5L)
+  }
 
-      val snapshot = rangeSampler.distribution()
-      snapshot.min should be(0)
-      snapshot.max should be(5)
-    }
+  test("reset the min and max to the current value after taking a snapshot") {
+    val rangeSampler = Kamon.rangeSampler("reset-range-sampler-to-current").withoutTags()
 
-    "reset the min and max to the current value after taking a snapshot" in {
-      val rangeSampler = Kamon.rangeSampler("reset-range-sampler-to-current").withoutTags()
+    rangeSampler.increment(5)
+    rangeSampler.decrement(3)
+    rangeSampler.sample()
 
-      rangeSampler.increment(5)
-      rangeSampler.decrement(3)
-      rangeSampler.sample()
+    val firstSnapshot = rangeSampler.distribution()
+    assertEquals(firstSnapshot.min, 0L)
+    assertEquals(firstSnapshot.max, 5L)
 
-      val firstSnapshot = rangeSampler.distribution()
-      firstSnapshot.min should be(0)
-      firstSnapshot.max should be(5)
+    rangeSampler.sample()
+    val secondSnapshot = rangeSampler.distribution()
+    assertEquals(secondSnapshot.min, 2L)
+    assertEquals(secondSnapshot.max, 2L)
+  }
 
-      rangeSampler.sample()
-      val secondSnapshot = rangeSampler.distribution()
-      secondSnapshot.min should be(2)
-      secondSnapshot.max should be(2)
-    }
+  test("report zero as the min and current values if the current value fell below zero") {
+    val rangeSampler = Kamon.rangeSampler("report-zero").withoutTags()
 
-    "report zero as the min and current values if the current value fell below zero" in {
-      val rangeSampler = Kamon.rangeSampler("report-zero").withoutTags()
+    rangeSampler.decrement(3)
+    rangeSampler.sample()
 
-      rangeSampler.decrement(3)
-      rangeSampler.sample()
+    val snapshot = rangeSampler.distribution()
+    assertEquals(snapshot.min, 0L)
+    assertEquals(snapshot.max, 0L)
+  }
 
-      val snapshot = rangeSampler.distribution()
-      snapshot.min should be(0)
-      snapshot.max should be(0)
-    }
+  test("sample automatically by default") {
+    val rangeSampler = Kamon.rangeSampler(
+      "auto-update",
+      MeasurementUnit.none,
+      Duration.ofMillis(1)
+    ).withoutTags()
 
-    "sample automatically by default" in {
-      val rangeSampler = Kamon.rangeSampler(
-        "auto-update",
-        MeasurementUnit.none,
-        Duration.ofMillis(1)
-      ).withoutTags()
+    rangeSampler.increment()
+    rangeSampler.increment(3)
+    rangeSampler.increment()
 
-      rangeSampler.increment()
-      rangeSampler.increment(3)
-      rangeSampler.increment()
+    Thread.sleep(50)
 
-      Thread.sleep(50)
+    val snapshot = rangeSampler.distribution()
+    assertEquals(snapshot.min, 0L)
+    assertEquals(snapshot.max, 5L)
+  }
 
-      val snapshot = rangeSampler.distribution()
-      snapshot.min should be(0)
-      snapshot.max should be(5)
-    }
+  test("reset values to 0 after calling resetDistribution") {
+    val rangeSampler = Kamon.rangeSampler(
+      "auto-update2",
+      MeasurementUnit.none,
+      Duration.ofMillis(1)
+    ).withoutTags()
 
-    "reset values to 0 after calling resetDistribution" in {
-      val rangeSampler = Kamon.rangeSampler(
-        "auto-update2",
-        MeasurementUnit.none,
-        Duration.ofMillis(1)
-      ).withoutTags()
+    rangeSampler.increment(5)
+    rangeSampler.resetDistribution()
 
-      rangeSampler.increment(5)
-      rangeSampler.resetDistribution()
+    Thread.sleep(50)
+    rangeSampler.resetDistribution()
 
-      Thread.sleep(50)
-      rangeSampler.resetDistribution()
+    val snapshot = rangeSampler.distribution()
 
-      val snapshot = rangeSampler.distribution()
-
-      snapshot.min should be(0)
-      snapshot.max should be(0)
-      snapshot.sum should be(0)
-    }
+    assertEquals(snapshot.min, 0L)
+    assertEquals(snapshot.max, 0L)
+    assertEquals(snapshot.sum, 0L)
   }
 }

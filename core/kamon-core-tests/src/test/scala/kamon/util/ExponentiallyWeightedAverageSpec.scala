@@ -1,57 +1,38 @@
 package kamon.util
 
-import org.scalactic.TimesOnInt
-import org.scalatest.concurrent.Eventually
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.SpanSugar
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class ExponentiallyWeightedAverageSpec extends AnyWordSpec with Matchers with Eventually with SpanSugar
-    with TimesOnInt {
+class ExponentiallyWeightedAverageSuite extends FunSuite {
 
-  "an Exponentially Weighted Moving Average" should {
-    "converge to the actual average in few iterations from startup with the default weighting factor" in {
-      val ewma = EWMA.create()
-      ewma.add(60d)
-      ewma.add(40d)
-      ewma.add(55d)
-      ewma.add(45d)
-      ewma.add(50d)
-      ewma.add(50d)
-      ewma.add(50d)
+  test("converge to the actual average in few iterations from startup with the default weighting factor") {
+    val ewma = EWMA.create()
+    Seq(60d, 40d, 55d, 45d, 50d, 50d, 50d).foreach(ewma.add)
 
-      ewma.average() shouldBe 50d +- 5d
-    }
-
-    "catch up with an up trend" in {
-      val ewma = EWMA.create()
-      var value = 500
-
-      200 times {
-        value = value + 5
-        ewma.add(value)
-      }
-
-      ewma.average() shouldBe value.toDouble +- 50d
-    }
-
-    "take many iterations to converge on the average with a high weighting factor" in {
-      val ewma = EWMA.create(0.99d)
-      ewma.add(60d)
-      ewma.add(40d)
-      ewma.add(50d)
-      ewma.add(50d)
-      ewma.add(50d)
-
-      30 times {
-        ewma.add(50d)
-        ewma.add(50d)
-        ewma.add(50d)
-      }
-
-      ewma.average() shouldBe 50d +- 5d
-    }
-
+    assertEqualsDouble(ewma.average(), 50d, 5d)
   }
 
+  test("catch up with an up trend") {
+    val ewma = EWMA.create()
+    var value = 500
+
+    (1 to 200).foreach { _ =>
+      value += 5
+      ewma.add(value)
+    }
+
+    assertEqualsDouble(ewma.average(), value.toDouble, 50d)
+  }
+
+  test("take many iterations to converge on the average with a high weighting factor") {
+    val ewma = EWMA.create(0.99d)
+    Seq(60d, 40d, 50d, 50d, 50d).foreach(ewma.add)
+
+    (1 to 30).foreach { _ =>
+      ewma.add(50d)
+      ewma.add(50d)
+      ewma.add(50d)
+    }
+
+    assertEqualsDouble(ewma.average(), 50d, 5d)
+  }
 }

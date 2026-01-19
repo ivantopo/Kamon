@@ -2,41 +2,37 @@ package kamon.trace
 
 import kamon.context.{Context, HttpPropagation}
 import kamon.trace.Trace.SamplingDecision
-import org.scalatest.OptionValues
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
 import scala.collection.mutable
 
-class W3CTraceContextSpanPropagationSpec extends AnyWordSpec with Matchers with OptionValues {
+class W3CTraceContextSpanPropagationSpec extends FunSuite {
   val traceContextPropagation = SpanPropagation.W3CTraceContext()
 
-  "The TraceContext Span propagation for HTTP" should {
-    "write the Span data into headers" in {
-      val headersMap = mutable.Map.empty[String, String]
-      traceContextPropagation.write(testContext(), headerWriterFromMap(headersMap))
+  test("write the Span data into headers") {
+    val headersMap = mutable.Map.empty[String, String]
+    traceContextPropagation.write(testContext(), headerWriterFromMap(headersMap))
 
-      headersMap.get("traceparent").value shouldBe "00-00000000000000000000000001020304-0000000004030201-01"
-      headersMap.get("tracestate").value shouldBe ""
-    }
+    assertEquals(headersMap.get("traceparent"), Some("00-00000000000000000000000001020304-0000000004030201-01"))
+    assertEquals(headersMap.get("tracestate"), Some(""))
+  }
 
-    "not inject anything if there is no Span in the Context" in {
-      val headersMap = mutable.Map.empty[String, String]
-      traceContextPropagation.write(Context.Empty, headerWriterFromMap(headersMap))
-      headersMap.values shouldBe empty
-    }
+  test("not inject anything if there is no Span in the Context") {
+    val headersMap = mutable.Map.empty[String, String]
+    traceContextPropagation.write(Context.Empty, headerWriterFromMap(headersMap))
+    assert(headersMap.values.isEmpty)
+  }
 
-    "extract a RemoteSpan from incoming headers when all fields are set" in {
-      val headersMap = Map(
-        "traceparent" -> "00-00000000000000000000000001020304-0000000004030201-01",
-        "tracestate" -> "2222"
-      )
+  test("extract a RemoteSpan from incoming headers when all fields are set") {
+    val headersMap = Map(
+      "traceparent" -> "00-00000000000000000000000001020304-0000000004030201-01",
+      "tracestate" -> "2222"
+    )
 
-      val spanContext = traceContextPropagation.read(headerReaderFromMap(headersMap), Context.Empty).get(Span.Key)
-      spanContext.parentId.string shouldBe empty
-      spanContext.trace.id.string shouldBe "00000000000000000000000001020304"
-      spanContext.trace.samplingDecision shouldBe SamplingDecision.Sample
-    }
+    val spanContext = traceContextPropagation.read(headerReaderFromMap(headersMap), Context.Empty).get(Span.Key)
+    assert(spanContext.parentId.string.isEmpty)
+    assertEquals(spanContext.trace.id.string, "00000000000000000000000001020304")
+    assertEquals(spanContext.trace.samplingDecision, SamplingDecision.Sample)
   }
 
   def headerWriterFromMap(map: mutable.Map[String, String]): HttpPropagation.HeaderWriter =

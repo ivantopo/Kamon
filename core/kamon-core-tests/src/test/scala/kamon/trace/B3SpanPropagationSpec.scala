@@ -18,214 +18,228 @@ package kamon.trace
 
 import kamon.context.{Context, HttpPropagation}
 import kamon.trace.Trace.SamplingDecision
-import org.scalatest.OptionValues
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
 import scala.collection.mutable
 
-class B3SpanPropagationSpec extends AnyWordSpec with Matchers with OptionValues {
+class B3SpanPropagationSpec extends FunSuite {
   val b3Propagation = SpanPropagation.B3()
 
-  "The B3 Span propagation for HTTP" should {
-    "write the Span data into headers" in {
-      val headersMap = mutable.Map.empty[String, String]
-      b3Propagation.write(testContext(), headerWriterFromMap(headersMap))
+  test("write the Span data into headers") {
+    val headersMap = mutable.Map.empty[String, String]
+    b3Propagation.write(testContext(), headerWriterFromMap(headersMap))
 
-      headersMap.get("X-B3-TraceId").value shouldBe "1234"
-      headersMap.get("X-B3-ParentSpanId").value shouldBe "2222"
-      headersMap.get("X-B3-SpanId").value shouldBe "4321"
-      headersMap.get("X-B3-Sampled").value shouldBe "1"
-    }
+    assertEquals(headersMap.get("X-B3-TraceId"), Some("1234"))
+    assertEquals(headersMap.get("X-B3-ParentSpanId"), Some("2222"))
+    assertEquals(headersMap.get("X-B3-SpanId"), Some("4321"))
+    assertEquals(headersMap.get("X-B3-Sampled"), Some("1"))
+  }
 
-    "do not include the X-B3-ParentSpanId if there is no parent" in {
-      val headersMap = mutable.Map.empty[String, String]
-      b3Propagation.write(testContextWithoutParent(), headerWriterFromMap(headersMap))
+  test("do not include the X-B3-ParentSpanId if there is no parent") {
+    val headersMap = mutable.Map.empty[String, String]
+    b3Propagation.write(testContextWithoutParent(), headerWriterFromMap(headersMap))
 
-      headersMap.get("X-B3-TraceId").value shouldBe "1234"
-      headersMap.get("X-B3-ParentSpanId") shouldBe empty
-      headersMap.get("X-B3-SpanId").value shouldBe "4321"
-      headersMap.get("X-B3-Sampled").value shouldBe "1"
-    }
+    assertEquals(headersMap.get("X-B3-TraceId"), Some("1234"))
+    assert(headersMap.get("X-B3-ParentSpanId").isEmpty)
+    assertEquals(headersMap.get("X-B3-SpanId"), Some("4321"))
+    assertEquals(headersMap.get("X-B3-Sampled"), Some("1"))
+  }
 
-    "not inject anything if there is no Span in the Context" in {
-      val headersMap = mutable.Map.empty[String, String]
-      b3Propagation.write(Context.Empty, headerWriterFromMap(headersMap))
-      headersMap.values shouldBe empty
-    }
+  test("not inject anything if there is no Span in the Context") {
+    val headersMap = mutable.Map.empty[String, String]
+    b3Propagation.write(Context.Empty, headerWriterFromMap(headersMap))
+    assert(headersMap.values.isEmpty)
+  }
 
-    "extract a RemoteSpan from incoming headers when all fields are set" in {
-      val headersMap = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-ParentSpanId" -> "2222",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Sampled" -> "1",
-        "X-B3-Extra-Baggage" -> "some=baggage;more=baggage"
-      )
+  test("extract a RemoteSpan from incoming headers when all fields are set") {
+    val headersMap = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-ParentSpanId" -> "2222",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Sampled" -> "1",
+      "X-B3-Extra-Baggage" -> "some=baggage;more=baggage"
+    )
 
-      val spanContext = b3Propagation.read(headerReaderFromMap(headersMap), Context.Empty).get(Span.Key)
-      spanContext.id.string shouldBe "4321"
-      spanContext.parentId.string shouldBe "2222"
-      spanContext.trace.id.string shouldBe "1234"
-      spanContext.trace.samplingDecision shouldBe SamplingDecision.Sample
-    }
+    val spanContext = b3Propagation.read(headerReaderFromMap(headersMap), Context.Empty).get(Span.Key)
+    assertEquals(spanContext.id.string, "4321")
+    assertEquals(spanContext.parentId.string, "2222")
+    assertEquals(spanContext.trace.id.string, "1234")
+    assertEquals(spanContext.trace.samplingDecision, SamplingDecision.Sample)
+  }
 
-    "decode the sampling decision based on the X-B3-Sampled header" in {
-      val sampledHeaders = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Sampled" -> "1"
-      )
+  test("decode the sampling decision based on the X-B3-Sampled header") {
+    val sampledHeaders = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Sampled" -> "1"
+    )
 
-      val notSampledHeaders = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Sampled" -> "0"
-      )
+    val notSampledHeaders = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Sampled" -> "0"
+    )
 
-      val noSamplingHeaders = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321"
-      )
+    val noSamplingHeaders = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321"
+    )
 
+    assertEquals(
       b3Propagation.read(headerReaderFromMap(sampledHeaders), Context.Empty)
-        .get(Span.Key).trace.samplingDecision shouldBe SamplingDecision.Sample
+        .get(Span.Key).trace.samplingDecision,
+      SamplingDecision.Sample
+    )
 
+    assertEquals(
       b3Propagation.read(headerReaderFromMap(notSampledHeaders), Context.Empty)
-        .get(Span.Key).trace.samplingDecision shouldBe SamplingDecision.DoNotSample
+        .get(Span.Key).trace.samplingDecision,
+      SamplingDecision.DoNotSample
+    )
 
+    assertEquals(
       b3Propagation.read(headerReaderFromMap(noSamplingHeaders), Context.Empty)
-        .get(Span.Key).trace.samplingDecision shouldBe SamplingDecision.Unknown
-    }
+        .get(Span.Key).trace.samplingDecision,
+      SamplingDecision.Unknown
+    )
+  }
 
-    "not include the X-B3-Sampled header if the sampling decision is unknown" in {
-      val context = testContext()
-      val sampledSpan = context.get(Span.Key)
-      val notSampledSpanContext = Context.Empty.withEntry(
-        Span.Key,
-        new Span.Remote(sampledSpan.id, sampledSpan.parentId, Trace(sampledSpan.trace.id, SamplingDecision.DoNotSample))
-      )
-      val unknownSamplingSpanContext = Context.Empty.withEntry(
-        Span.Key,
-        new Span.Remote(sampledSpan.id, sampledSpan.parentId, Trace(sampledSpan.trace.id, SamplingDecision.Unknown))
-      )
-      val headersMap = mutable.Map.empty[String, String]
+  test("not include the X-B3-Sampled header if the sampling decision is unknown") {
+    val context = testContext()
+    val sampledSpan = context.get(Span.Key)
+    val notSampledSpanContext = Context.Empty.withEntry(
+      Span.Key,
+      new Span.Remote(sampledSpan.id, sampledSpan.parentId, Trace(sampledSpan.trace.id, SamplingDecision.DoNotSample))
+    )
+    val unknownSamplingSpanContext = Context.Empty.withEntry(
+      Span.Key,
+      new Span.Remote(sampledSpan.id, sampledSpan.parentId, Trace(sampledSpan.trace.id, SamplingDecision.Unknown))
+    )
+    val headersMap = mutable.Map.empty[String, String]
 
-      b3Propagation.write(context, headerWriterFromMap(headersMap))
-      headersMap.get("X-B3-Sampled").value shouldBe ("1")
-      headersMap.clear()
+    b3Propagation.write(context, headerWriterFromMap(headersMap))
+    assertEquals(headersMap.get("X-B3-Sampled"), Some("1"))
+    headersMap.clear()
 
-      b3Propagation.write(notSampledSpanContext, headerWriterFromMap(headersMap))
-      headersMap.get("X-B3-Sampled").value shouldBe ("0")
-      headersMap.clear()
+    b3Propagation.write(notSampledSpanContext, headerWriterFromMap(headersMap))
+    assertEquals(headersMap.get("X-B3-Sampled"), Some("0"))
+    headersMap.clear()
 
-      b3Propagation.write(unknownSamplingSpanContext, headerWriterFromMap(headersMap))
-      headersMap.get("X-B3-Sampled") shouldBe empty
-    }
+    b3Propagation.write(unknownSamplingSpanContext, headerWriterFromMap(headersMap))
+    assert(headersMap.get("X-B3-Sampled").isEmpty)
+  }
 
-    "use the Debug flag to override the sampling decision, if provided." in {
-      val headers = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Sampled" -> "0",
-        "X-B3-Flags" -> "1"
-      )
+  test("use the Debug flag to override the sampling decision, if provided") {
+    val headers = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Sampled" -> "0",
+      "X-B3-Flags" -> "1"
+    )
 
-      val span = b3Propagation.read(headerReaderFromMap(headers), Context.Empty).get(Span.Key)
-      span.trace.samplingDecision shouldBe SamplingDecision.Sample
-    }
+    val span = b3Propagation.read(headerReaderFromMap(headers), Context.Empty).get(Span.Key)
+    assertEquals(span.trace.samplingDecision, SamplingDecision.Sample)
+  }
 
-    "fall back to sampling header if debug flag is set to any other value" in {
-      val sampledHeaders = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Sampled" -> "1",
-        "X-B3-Flags" -> "0"
-      )
+  test("fall back to sampling header if debug flag is set to any other value") {
+    val sampledHeaders = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Sampled" -> "1",
+      "X-B3-Flags" -> "0"
+    )
 
-      val notSampledHeaders = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Sampled" -> "0",
-        "X-B3-Flags" -> "0"
-      )
+    val notSampledHeaders = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Sampled" -> "0",
+      "X-B3-Flags" -> "0"
+    )
 
-      val noSamplingHeaders = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Flags" -> "0"
-      )
+    val noSamplingHeaders = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Flags" -> "0"
+    )
 
+    assertEquals(
       b3Propagation.read(headerReaderFromMap(sampledHeaders), Context.Empty)
-        .get(Span.Key).trace.samplingDecision shouldBe SamplingDecision.Sample
+        .get(Span.Key).trace.samplingDecision,
+      SamplingDecision.Sample
+    )
 
+    assertEquals(
       b3Propagation.read(headerReaderFromMap(notSampledHeaders), Context.Empty)
-        .get(Span.Key).trace.samplingDecision shouldBe SamplingDecision.DoNotSample
+        .get(Span.Key).trace.samplingDecision,
+      SamplingDecision.DoNotSample
+    )
 
+    assertEquals(
       b3Propagation.read(headerReaderFromMap(noSamplingHeaders), Context.Empty)
-        .get(Span.Key).trace.samplingDecision shouldBe SamplingDecision.Unknown
-    }
+        .get(Span.Key).trace.samplingDecision,
+      SamplingDecision.Unknown
+    )
+  }
 
-    "use the Debug flag as sampling decision when Sampled is not provided" in {
-      val headers = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-Flags" -> "1"
-      )
+  test("use the Debug flag as sampling decision when Sampled is not provided") {
+    val headers = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-Flags" -> "1"
+    )
 
-      val span = b3Propagation.read(headerReaderFromMap(headers), Context.Empty).get(Span.Key)
-      span.trace.samplingDecision shouldBe SamplingDecision.Sample
-    }
+    val span = b3Propagation.read(headerReaderFromMap(headers), Context.Empty).get(Span.Key)
+    assertEquals(span.trace.samplingDecision, SamplingDecision.Sample)
+  }
 
-    "extract a minimal SpanContext from a TextMap containing only the Trace ID and Span ID" in {
-      val headers = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321"
-      )
+  test("extract a minimal SpanContext from a TextMap containing only the Trace ID and Span ID") {
+    val headers = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321"
+    )
 
-      val span = b3Propagation.read(headerReaderFromMap(headers), Context.Empty).get(Span.Key)
-      span.id.string shouldBe "4321"
-      span.parentId shouldBe Identifier.Empty
-      span.trace.id.string shouldBe "1234"
-      span.trace.samplingDecision shouldBe SamplingDecision.Unknown
-    }
+    val span = b3Propagation.read(headerReaderFromMap(headers), Context.Empty).get(Span.Key)
+    assertEquals(span.id.string, "4321")
+    assertEquals(span.parentId, Identifier.Empty)
+    assertEquals(span.trace.id.string, "1234")
+    assertEquals(span.trace.samplingDecision, SamplingDecision.Unknown)
+  }
 
-    "do not extract a SpanContext if Trace ID and Span ID are not provided" in {
-      val onlyTraceID = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-Sampled" -> "0",
-        "X-B3-Flags" -> "1"
-      )
+  test("do not extract a SpanContext if Trace ID and Span ID are not provided") {
+    val onlyTraceID = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-Sampled" -> "0",
+      "X-B3-Flags" -> "1"
+    )
 
-      val onlySpanID = Map(
-        "X-B3-SpanId" -> "1234",
-        "X-B3-Sampled" -> "0",
-        "X-B3-Flags" -> "1"
-      )
+    val onlySpanID = Map(
+      "X-B3-SpanId" -> "1234",
+      "X-B3-Sampled" -> "0",
+      "X-B3-Flags" -> "1"
+    )
 
-      val noIds = Map(
-        "X-B3-Sampled" -> "0",
-        "X-B3-Flags" -> "1"
-      )
+    val noIds = Map(
+      "X-B3-Sampled" -> "0",
+      "X-B3-Flags" -> "1"
+    )
 
-      b3Propagation.read(headerReaderFromMap(onlyTraceID), Context.Empty).get(Span.Key) shouldBe Span.Empty
-      b3Propagation.read(headerReaderFromMap(onlySpanID), Context.Empty).get(Span.Key) shouldBe Span.Empty
-      b3Propagation.read(headerReaderFromMap(noIds), Context.Empty).get(Span.Key) shouldBe Span.Empty
-    }
+    assertEquals(b3Propagation.read(headerReaderFromMap(onlyTraceID), Context.Empty).get(Span.Key), Span.Empty)
+    assertEquals(b3Propagation.read(headerReaderFromMap(onlySpanID), Context.Empty).get(Span.Key), Span.Empty)
+    assertEquals(b3Propagation.read(headerReaderFromMap(noIds), Context.Empty).get(Span.Key), Span.Empty)
+  }
 
-    "round trip a Span from TextMap -> Context -> TextMap" in {
-      val headers = Map(
-        "X-B3-TraceId" -> "1234",
-        "X-B3-SpanId" -> "4321",
-        "X-B3-ParentSpanId" -> "2222",
-        "X-B3-Sampled" -> "1"
-      )
+  test("round trip a Span from TextMap -> Context -> TextMap") {
+    val headers = Map(
+      "X-B3-TraceId" -> "1234",
+      "X-B3-SpanId" -> "4321",
+      "X-B3-ParentSpanId" -> "2222",
+      "X-B3-Sampled" -> "1"
+    )
 
-      val writenHeaders = mutable.Map.empty[String, String]
-      val context = b3Propagation.read(headerReaderFromMap(headers), Context.Empty)
-      b3Propagation.write(context, headerWriterFromMap(writenHeaders))
-      writenHeaders should contain theSameElementsAs (headers)
-    }
+    val writenHeaders = mutable.Map.empty[String, String]
+    val context = b3Propagation.read(headerReaderFromMap(headers), Context.Empty)
+    b3Propagation.write(context, headerWriterFromMap(writenHeaders))
+    assertEquals(writenHeaders.toMap, headers)
   }
 
   def headerReaderFromMap(map: Map[String, String]): HttpPropagation.HeaderReader = new HttpPropagation.HeaderReader {

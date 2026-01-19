@@ -17,51 +17,48 @@ package kamon.metric
 
 import kamon.Kamon
 import kamon.testkit.InstrumentInspection
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class TimerSpec extends AnyWordSpec with Matchers with InstrumentInspection.Syntax {
+class TimerSuite extends FunSuite with InstrumentInspection.Syntax {
 
-  "a Timer" should {
-    "record the duration between calls to .start() and .stop() in the StartedTimer" in {
-      val timer = Kamon.timer("timer-spec").withoutTags()
-      timer.start().stop()
-      timer.start().stop()
-      timer.start().stop()
+  test("record the duration between calls to .start() and .stop() in the StartedTimer") {
+    val timer = Kamon.timer("timer-spec").withoutTags()
+    timer.start().stop()
+    timer.start().stop()
+    timer.start().stop()
 
-      timer.distribution().count shouldBe 3
-    }
+    assertEquals(timer.distribution().count, 3L)
+  }
 
-    "ensure that a started timer can only be stopped once" in {
-      val timer = Kamon.timer("timer-spec").withoutTags()
-      val startedTimer = timer.start()
-      startedTimer.stop()
-      startedTimer.stop()
-      startedTimer.stop()
+  test("ensure that a started timer can only be stopped once") {
+    val timer = Kamon.timer("timer-stop-once").withoutTags()
+    val startedTimer = timer.start()
+    startedTimer.stop()
+    startedTimer.stop()
+    startedTimer.stop()
 
-      timer.distribution().count shouldBe 1
-    }
+    assertEquals(timer.distribution().count, 1L)
+  }
 
-    "allow to record values and produce distributions as Histograms do" in {
-      val timer = Kamon.timer("test-timer").withoutTags()
-      timer.record(100)
-      timer.record(200)
+  test("allow to record values and produce distributions as Histograms do") {
+    val timer = Kamon.timer("test-timer").withoutTags()
+    timer.record(100)
+    timer.record(200)
 
-      val distribution = timer.distribution()
-      distribution.min shouldBe 100
-      distribution.max shouldBe 200
-      distribution.count shouldBe 2
-      distribution.buckets.length shouldBe 2
-      distribution.buckets.map(b => (b.value, b.frequency)) should contain.allOf(
-        100 -> 1,
-        200 -> 1
-      )
+    val distribution = timer.distribution()
+    assertEquals(distribution.min, 100L)
+    assertEquals(distribution.max, 200L)
+    assertEquals(distribution.count, 2L)
+    assertEquals(distribution.buckets.length, 2)
 
-      val emptyDistribution = timer.distribution()
-      emptyDistribution.min shouldBe 0
-      emptyDistribution.max shouldBe 0
-      emptyDistribution.count shouldBe 0
-      emptyDistribution.buckets.length shouldBe 0
-    }
+    val bucketValues = distribution.buckets.map(b => (b.value, b.frequency)).toSet
+    assert(bucketValues.contains((100L, 1L)))
+    assert(bucketValues.contains((200L, 1L)))
+
+    val emptyDistribution = timer.distribution()
+    assertEquals(emptyDistribution.min, 0L)
+    assertEquals(emptyDistribution.max, 0L)
+    assertEquals(emptyDistribution.count, 0L)
+    assertEquals(emptyDistribution.buckets.length, 0)
   }
 }

@@ -16,56 +16,52 @@
 
 package kamon.util
 
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class GlobPathFilterSpec extends AnyWordSpec with Matchers {
-  "The GlobPathFilter" should {
+class GlobPathFilterSuite extends FunSuite {
+  test("match a single expression") {
+    val filter = Filter.Glob("/user/actor")
 
-    "match a single expression" in {
-      val filter = Filter.Glob("/user/actor")
+    assert(filter.accept("/user/actor"))
+    assert(!filter.accept("/user/actor/something"))
+    assert(!filter.accept("/user/actor/somethingElse"))
+  }
 
-      filter.accept("/user/actor") shouldBe true
-      filter.accept("/user/actor/something") shouldBe false
-      filter.accept("/user/actor/somethingElse") shouldBe false
-    }
+  test("match all expressions in the same level") {
+    val filter = Filter.Glob("/user/*")
 
-    "match all expressions in the same level" in {
-      val filter = Filter.Glob("/user/*")
+    assert(filter.accept("/user/actor"))
+    assert(filter.accept("/user/otherActor"))
+    assert(!filter.accept("/user/something/actor"))
+    assert(!filter.accept("/user/something/otherActor"))
+  }
 
-      filter.accept("/user/actor") shouldBe true
-      filter.accept("/user/otherActor") shouldBe true
-      filter.accept("/user/something/actor") shouldBe false
-      filter.accept("/user/something/otherActor") shouldBe false
-    }
+  test("match any expressions when using double star alone (**) ") {
+    val filter = Filter.Glob("**")
 
-    "match any expressions when using double star alone (**)" in {
-      val filter = Filter.Glob("**")
+    assert(filter.accept("GET: /ping"))
+    assert(filter.accept("GET: /ping/pong"))
+    assert(filter.accept("this-doesn't_look good but-passes"))
+  }
 
-      filter.accept("GET: /ping") shouldBe true
-      filter.accept("GET: /ping/pong") shouldBe true
-      filter.accept("this-doesn't_look good but-passes") shouldBe true
-    }
+  test("match all expressions and cross the path boundaries when using double star suffix (**)") {
+    val filter = Filter.Glob("/user/actor-**")
 
-    "match all expressions and cross the path boundaries when using double star suffix (**)" in {
-      val filter = Filter.Glob("/user/actor-**")
+    assert(filter.accept("/user/actor-"))
+    assert(filter.accept("/user/actor-one"))
+    assert(filter.accept("/user/actor-one/other"))
+    assert(!filter.accept("/user/something/actor"))
+    assert(!filter.accept("/user/something/otherActor"))
+  }
 
-      filter.accept("/user/actor-") shouldBe true
-      filter.accept("/user/actor-one") shouldBe true
-      filter.accept("/user/actor-one/other") shouldBe true
-      filter.accept("/user/something/actor") shouldBe false
-      filter.accept("/user/something/otherActor") shouldBe false
-    }
+  test("match exactly one character when using question mark (?)") {
+    val filter = Filter.Glob("/user/actor-?")
 
-    "match exactly one character when using question mark (?)" in {
-      val filter = Filter.Glob("/user/actor-?")
-
-      filter.accept("/user/actor-1") shouldBe true
-      filter.accept("/user/actor-2") shouldBe true
-      filter.accept("/user/actor-3") shouldBe true
-      filter.accept("/user/actor-one") shouldBe false
-      filter.accept("/user/actor-two") shouldBe false
-      filter.accept("/user/actor-tree") shouldBe false
-    }
+    assert(filter.accept("/user/actor-1"))
+    assert(filter.accept("/user/actor-2"))
+    assert(filter.accept("/user/actor-3"))
+    assert(!filter.accept("/user/actor-one"))
+    assert(!filter.accept("/user/actor-two"))
+    assert(!filter.accept("/user/actor-tree"))
   }
 }

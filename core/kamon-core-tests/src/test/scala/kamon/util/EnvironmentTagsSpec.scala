@@ -13,17 +13,17 @@
  * =========================================================================================
  */
 
-package kamon
-package util
+package kamon.util
 
 import com.typesafe.config.ConfigFactory
+import kamon.Kamon
 import kamon.status.Environment
 import kamon.tag.TagSet
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class EnvironmentTagsSpec extends AnyWordSpec with Matchers {
+class EnvironmentTagsSuite extends FunSuite {
   private val testEnv = Environment.from(ConfigFactory.parseString(
+
     """
       |kamon.environment {
       |  service = environment-spec
@@ -53,43 +53,43 @@ class EnvironmentTagsSpec extends AnyWordSpec with Matchers {
     """.stripMargin
   ).withFallback(ConfigFactory.defaultReference()))
 
-  "the EnvironmentTagBuilder" should {
+  test("build the tags from a configuration using the current Environment") {
+    val config = ConfigFactory.parseString(
+      """
+        |include-service = yes
+        |include-host = yes
+        |include-instance = yes
+        |exclude = []
+      """.stripMargin
+    )
 
-    "build the tags from a configuration using the current Environment" in {
-      val config = ConfigFactory.parseString(
-        """
-          |include-service = yes
-          |include-host = yes
-          |include-instance = yes
-          |exclude = []
-        """.stripMargin
-      )
+    val env = Kamon.environment
+    val tags = EnvironmentTags.from(env, config)
+    assertEquals(tags("service"), env.service)
+    assertEquals(tags("host"), env.host)
+    assertEquals(tags("instance"), env.instance)
+  }
 
-      val env = Kamon.environment
-      val tags = EnvironmentTags.from(env, config)
-      tags("service") shouldBe env.service
-      tags("host") shouldBe env.host
-      tags("instance") shouldBe env.instance
-    }
+  test("build tags from a custom Environment") {
+    val config = ConfigFactory.parseString(
+      """
+        |include-service = yes
+        |include-host = yes
+        |include-instance = yes
+        |exclude = []
+      """.stripMargin
+    )
 
-    "build tags from a custom Environment" in {
-      val config = ConfigFactory.parseString(
-        """
-          |include-service = yes
-          |include-host = yes
-          |include-instance = yes
-          |exclude = []
-        """.stripMargin
-      )
+    val tags = EnvironmentTags.from(testEnv, config)
+    assertEquals(tags("service"), testEnv.service)
+    assertEquals(tags("host"), testEnv.host)
+    assertEquals(tags("instance"), testEnv.instance)
+    assertEquals(tags("env"), "staging")
+    assertEquals(tags("region"), "asia-1")
 
-      val tags = EnvironmentTags.from(testEnv, config)
-      tags("service") shouldBe testEnv.service
-      tags("host") shouldBe testEnv.host
-      tags("instance") shouldBe testEnv.instance
-      tags("env") shouldBe "staging"
-      tags("region") shouldBe "asia-1"
-
-      tags.toMap shouldBe Map(
+    assertEquals(
+      tags.toMap,
+      Map(
         "@tag-with-special-chars" -> "value",
         "env" -> "staging",
         "host" -> "my-hostname",
@@ -102,56 +102,56 @@ class EnvironmentTagsSpec extends AnyWordSpec with Matchers {
         "defined-using-quotes" -> "value",
         "\"tag-with-quotes\"" -> "value"
       )
-    }
-
-    "remove excluded tags" in {
-      val config = ConfigFactory.parseString(
-        """
-          |include-service = yes
-          |include-host = yes
-          |include-instance = yes
-          |exclude = [ "region" ]
-        """.stripMargin
-      )
-
-      val tags = EnvironmentTags.from(testEnv, config)
-      tags("service") shouldBe testEnv.service
-      tags("host") shouldBe testEnv.host
-      tags("instance") shouldBe testEnv.instance
-      tags("env") shouldBe "staging"
-      tags.toMap.get("region") shouldBe empty
-    }
-
-    "remove all disabled elements" in {
-      val config = ConfigFactory.parseString(
-        """
-          |include-service = no
-          |include-host = no
-          |include-instance = no
-          |exclude = [
-          | "region",
-          | "env",
-          | "k8s.namespace.name",
-          | "some.tag.inside",
-          | "some.tag.@inside",
-          | "defined-using-quotes",
-          | "@tag-with-special-chars",
-          | "\"tag-with-quotes\""
-          |]
-        """.stripMargin
-      )
-
-      val tags = EnvironmentTags.from(testEnv, config)
-      tags shouldBe empty
-    }
-
-    "allow for nested tag names" in {
-      testEnv.tags("k8s.namespace.name") shouldBe "production"
-      testEnv.tags("some.tag.inside") shouldBe "example"
-    }
+    )
   }
 
-  implicit def toMap(tags: TagSet): Map[String, String] = {
+  test("remove excluded tags") {
+    val config = ConfigFactory.parseString(
+      """
+        |include-service = yes
+        |include-host = yes
+        |include-instance = yes
+        |exclude = [ "region" ]
+      """.stripMargin
+    )
+
+    val tags = EnvironmentTags.from(testEnv, config)
+    assertEquals(tags("service"), testEnv.service)
+    assertEquals(tags("host"), testEnv.host)
+    assertEquals(tags("instance"), testEnv.instance)
+    assertEquals(tags("env"), "staging")
+    assertEquals(tags.toMap.get("region"), None)
+  }
+
+  test("remove all disabled elements") {
+    val config = ConfigFactory.parseString(
+      """
+        |include-service = no
+        |include-host = no
+        |include-instance = no
+        |exclude = [
+        | "region",
+        | "env",
+        | "k8s.namespace.name",
+        | "some.tag.inside",
+        | "some.tag.@inside",
+        | "defined-using-quotes",
+        | "@tag-with-special-chars",
+        | "\"tag-with-quotes\""
+        |]
+      """.stripMargin
+    )
+
+    val tags = EnvironmentTags.from(testEnv, config)
+    assertEquals(tags.size, 0)
+  }
+
+  test("allow for nested tag names") {
+    assertEquals(testEnv.tags("k8s.namespace.name"), "production")
+    assertEquals(testEnv.tags("some.tag.inside"), "example")
+  }
+
+  private implicit def toMap(tags: TagSet): Map[String, String] = {
     val map = Map.newBuilder[String, String]
     tags.iterator(_.toString).foreach(pair => map += pair.key -> pair.value)
     map.result()

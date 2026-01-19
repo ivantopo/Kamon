@@ -18,68 +18,64 @@ package kamon.metric
 import java.time.Duration
 import java.util.function.Supplier
 import kamon.Kamon
-import kamon.testkit.{InitAndStopKamonAfterAll, InstrumentInspection}
-import org.scalatest.concurrent.Eventually
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
 import kamon.metric.Counter.delta
+import kamon.testkit.InstrumentInspection
+import kamon.testkit.munit.{Eventually, InitAndStopKamonAfterAll}
+import munit.FunSuite
 
-class CounterSpec extends AnyWordSpec with Matchers with InstrumentInspection.Syntax with Eventually
-    with InitAndStopKamonAfterAll {
+class CounterSuite extends FunSuite with InstrumentInspection.Syntax with Eventually with InitAndStopKamonAfterAll {
 
-  "a Counter" should {
-    "allow unit and bundled increments" in {
-      val counter = Kamon.counter("unit-increments").withoutTags()
-      counter.increment()
-      counter.increment()
-      counter.increment(40)
+  test("allow unit and bundled increments") {
+    val counter = Kamon.counter("unit-increments").withoutTags()
+    counter.increment()
+    counter.increment()
+    counter.increment(40)
 
-      counter.value shouldBe 42
+    assertEquals(counter.value(), 42L)
+  }
+
+  test("warn the user and ignore attempts to decrement the counter") {
+    val counter = Kamon.counter("attempt-to-decrement").withoutTags()
+    counter.increment(100)
+    counter.increment(100)
+    counter.increment(100)
+
+    assertEquals(counter.value(), 300L)
+  }
+
+  test("reset the internal state to zero after taking snapshots as a default behavior") {
+    val counter = Kamon.counter("reset-after-snapshot").withoutTags()
+    counter.increment()
+    counter.increment(10)
+
+    assertEquals(counter.value(), 11L)
+    assertEquals(counter.value(), 0L)
+  }
+
+  test("optionally leave the internal state unchanged") {
+    val counter = Kamon.counter("leave-state-unchanged").withoutTags()
+    counter.increment()
+    counter.increment(10)
+
+    assertEquals(counter.value(resetState = false), 11L)
+    assertEquals(counter.value(resetState = false), 11L)
+  }
+
+  test("have an easy to setup delta auto-update that stores difference between the last two observations of a supplier") {
+    val autoUpdateCounter = Kamon.counter("auto-update-delta").withoutTags()
+      .autoUpdate(delta(supplierOf(0, 0, 1, 1, 2, 3, 4, 6, 8, 10, 12, 16, 18)), Duration.ofMillis(1))
+
+    eventually() {
+      assertEquals(autoUpdateCounter.value(resetState = false), 18L)
     }
+  }
 
-    "warn the user and ignore attempts to decrement the counter" in {
-      val counter = Kamon.counter("attempt-to-decrement").withoutTags()
-      counter.increment(100)
-      counter.increment(100)
-      counter.increment(100)
+  test("ignore decrements in observations") {
+    val autoUpdateCounter = Kamon.counter("auto-update-delta-with-decrement").withoutTags()
+      .autoUpdate(delta(supplierOf(0, 0, 1, 1, 2, 3, 4, 6, 5, 4, 10, 16, 18)), Duration.ofMillis(1))
 
-      counter.value shouldBe 300
-    }
-
-    "reset the internal state to zero after taking snapshots as a default behavior" in {
-      val counter = Kamon.counter("reset-after-snapshot").withoutTags()
-      counter.increment()
-      counter.increment(10)
-
-      counter.value shouldBe 11
-      counter.value shouldBe 0
-    }
-
-    "optionally leave the internal state unchanged" in {
-      val counter = Kamon.counter("reset-after-snapshot").withoutTags()
-      counter.increment()
-      counter.increment(10)
-
-      counter.value(resetState = false) shouldBe 11
-      counter.value(resetState = false) shouldBe 11
-    }
-
-    "have an easy to setup delta auto-update that stores difference between the last two observations of a supplier" in {
-      val autoUpdateCounter = Kamon.counter("auto-update-delta").withoutTags()
-        .autoUpdate(delta(supplierOf(0, 0, 1, 1, 2, 3, 4, 6, 8, 10, 12, 16, 18)), Duration.ofMillis(1))
-
-      eventually {
-        autoUpdateCounter.value(resetState = false) shouldBe 18
-      }
-    }
-
-    "ignore decrements in observations" in {
-      val autoUpdateCounter = Kamon.counter("auto-update-delta-with-decrement").withoutTags()
-        .autoUpdate(delta(supplierOf(0, 0, 1, 1, 2, 3, 4, 6, 5, 4, 10, 16, 18)), Duration.ofMillis(1))
-
-      eventually {
-        autoUpdateCounter.value(resetState = false) shouldBe 20
-      }
+    eventually() {
+      assertEquals(autoUpdateCounter.value(resetState = false), 20L)
     }
   }
 

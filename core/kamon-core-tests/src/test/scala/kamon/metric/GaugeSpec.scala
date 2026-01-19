@@ -17,63 +17,59 @@ package kamon.metric
 
 import kamon.Kamon
 import kamon.testkit.InstrumentInspection
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class GaugeSpec extends AnyWordSpec with Matchers with InstrumentInspection.Syntax {
+class GaugeSuite extends FunSuite with InstrumentInspection.Syntax {
 
-  "a Gauge" should {
-    "have a starting value of zero" in {
-      val gauge = Kamon.gauge("default-value").withoutTags()
-      gauge.value shouldBe 0d
-    }
+  test("have a starting value of zero") {
+    val gauge = Kamon.gauge("default-value").withoutTags()
+    assertEquals(gauge.value(), 0d)
+  }
 
-    "retain the last value recorded on it" in {
-      val gauge = Kamon.gauge("retain-value").withoutTags().update(42d)
-      gauge.value shouldBe 42d
-      gauge.value shouldBe 42d
+  test("retain the last value recorded on it") {
+    val gauge = Kamon.gauge("retain-value").withoutTags().update(42d)
+    assertEquals(gauge.value(), 42d)
+    assertEquals(gauge.value(), 42d)
 
-      gauge.update(17d)
-      gauge.value shouldBe 17d
-      gauge.value shouldBe 17d
-    }
+    gauge.update(17d)
+    assertEquals(gauge.value(), 17d)
+    assertEquals(gauge.value(), 17d)
+  }
 
-    "ignore updates with negative values" in {
-      val gauge = Kamon.gauge("non-negative-value").withoutTags().update(30)
-      gauge.value shouldBe 30d
-      gauge.update(-20d)
-      gauge.value shouldBe 30d
+  test("ignore updates with negative values") {
+    val gauge = Kamon.gauge("non-negative-value").withoutTags().update(30)
+    assertEquals(gauge.value(), 30d)
+    gauge.update(-20d)
+    assertEquals(gauge.value(), 30d)
 
-      gauge.decrement(100)
-      gauge.value shouldBe 30d
+    gauge.decrement(100)
+    assertEquals(gauge.value(), 30d)
 
-      gauge.increment(-100)
-      gauge.value shouldBe 30d
-    }
+    gauge.increment(-100)
+    assertEquals(gauge.value(), 30d)
+  }
 
-    "increment and decrement the current value of the gauge" in {
-      val gauge = Kamon.gauge("increment-decrement").withoutTags().update(30)
-      gauge.value shouldBe 30d
-      gauge.increment(10d)
-      gauge.increment(10d)
-      gauge.value shouldBe 50d
+  test("increment and decrement the current value of the gauge") {
+    val gauge = Kamon.gauge("increment-decrement").withoutTags().update(30)
+    assertEquals(gauge.value(), 30d)
+    gauge.increment(10d)
+    gauge.increment(10d)
+    assertEquals(gauge.value(), 50d)
 
-      gauge.decrement(15)
-      gauge.decrement(15d)
-      gauge.value shouldBe 20d
-    }
+    gauge.decrement(15)
+    gauge.decrement(15d)
+    assertEquals(gauge.value(), 20d)
+  }
 
-    "increment and decrement the current value of the gauge with non whole values" in {
-      val gauge = Kamon.gauge("increment-decrement").withoutTags().update(30)
-      gauge.value shouldBe 30d
-      gauge.increment(10.5d)
-      gauge.increment(10.5d)
-      gauge.value shouldBe 51d
+  test("increment and decrement the current value of the gauge with non whole values") {
+    val gauge = Kamon.gauge("increment-decrement-non-whole").withoutTags().update(30)
+    assertEquals(gauge.value(), 30d)
+    gauge.increment(10.5d)
+    gauge.increment(10.5d)
+    assertEquals(gauge.value(), 51d)
 
-      gauge.decrement(10.5d)
-      gauge.decrement(10.5d)
-      gauge.value shouldBe 30d
-    }
-
+    gauge.decrement(10.5d)
+    gauge.decrement(10.5d)
+    assertEquals(gauge.value(), 30d)
   }
 }

@@ -1,61 +1,86 @@
 package kamon.util
 
 import kamon.util
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
 import java.time.{Duration, Instant}
 
-class ClockSpec extends AnyWordSpec with Matchers {
-  "the Clock" should {
-    "generate nanosecond precision Instants" in {
-      newClock().instant().getNano() % MicrosInSecond shouldNot be(0)
-    }
+class ClockSuite extends FunSuite {
+  private val MicrosInSecond = 1000000
 
-    "turn Instants into micros" in {
-      Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.000000000Z")) shouldBe 1513586399000000L
-      Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.000000010Z")) shouldBe 1513586399000000L
-      Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.987654321Z")) shouldBe 1513586399987654L
-      Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.987000000Z")) shouldBe 1513586399987000L
-    }
+  test("generate nanosecond precision Instants") {
+    val nanoRemainder = newClock().instant().getNano % MicrosInSecond
+    assertNotEquals(nanoRemainder, 0)
+  }
 
-    "calculate nanos between two Instants" in {
+  test("turn Instants into micros") {
+    assertEquals(Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.000000000Z")), 1513586399000000L)
+    assertEquals(Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.000000010Z")), 1513586399000000L)
+    assertEquals(Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.987654321Z")), 1513586399987654L)
+    assertEquals(Clock.toEpochMicros(Instant.parse("2017-12-18T08:39:59.987000000Z")), 1513586399987000L)
+  }
+
+  test("calculate nanos between two Instants") {
+    assertEquals(
       Clock.nanosBetween(
         Instant.parse("2017-12-18T08:39:59.987654321Z"),
         Instant.parse("2017-12-18T08:39:59.987654322Z")
-      ) shouldBe 1
+      ),
+      1L
+    )
+    assertEquals(
       Clock.nanosBetween(
         Instant.parse("2017-12-18T08:39:59.987654322Z"),
         Instant.parse("2017-12-18T08:39:59.987654321Z")
-      ) shouldBe -1
+      ),
+      -1L
+    )
+    assertEquals(
       Clock.nanosBetween(
         Instant.parse("2017-12-18T08:39:59.987Z"),
         Instant.parse("2017-12-18T08:39:59.988Z")
-      ) shouldBe 1000000
+      ),
+      1000000L
+    )
+    assertEquals(
       Clock.nanosBetween(
         Instant.parse("2017-12-18T08:39:59.987654Z"),
         Instant.parse("2017-12-18T08:39:59.987Z")
-      ) shouldBe -654000
-    }
-
-    "calculate ticks aligned to rounded boundaries" in {
-      Clock.nextAlignedInstant(
-        Instant.parse("2017-12-18T08:39:59.999Z"),
-        Duration.ofSeconds(10)
-      ).toString shouldBe "2017-12-18T08:40:00Z"
-      Clock.nextAlignedInstant(
-        Instant.parse("2017-12-18T08:40:00.000Z"),
-        Duration.ofSeconds(10)
-      ).toString shouldBe "2017-12-18T08:40:10Z"
-      Clock.nextAlignedInstant(
-        Instant.parse("2017-12-18T08:39:14.906Z"),
-        Duration.ofSeconds(10)
-      ).toString shouldBe "2017-12-18T08:39:20Z"
-    }
+      ),
+      -654000L
+    )
   }
 
-  val MicrosInSecond = 1000000
+  test("calculate ticks aligned to rounded boundaries") {
+    assertEquals(
+      Clock
+        .nextAlignedInstant(
+          Instant.parse("2017-12-18T08:39:59.999Z"),
+          Duration.ofSeconds(10)
+        )
+        .toString,
+      "2017-12-18T08:40:00Z"
+    )
+    assertEquals(
+      Clock
+        .nextAlignedInstant(
+          Instant.parse("2017-12-18T08:40:00.000Z"),
+          Duration.ofSeconds(10)
+        )
+        .toString,
+      "2017-12-18T08:40:10Z"
+    )
+    assertEquals(
+      Clock
+        .nextAlignedInstant(
+          Instant.parse("2017-12-18T08:39:14.906Z"),
+          Duration.ofSeconds(10)
+        )
+        .toString,
+      "2017-12-18T08:39:20Z"
+    )
+  }
 
-  def newClock(): Clock =
+  private def newClock(): Clock =
     new util.Clock.Anchored()
 }

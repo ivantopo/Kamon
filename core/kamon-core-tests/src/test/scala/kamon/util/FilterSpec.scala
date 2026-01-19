@@ -17,11 +17,10 @@ package kamon.util
 
 import com.typesafe.config.ConfigFactory
 import kamon.Kamon
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class FilterSpec extends AnyWordSpec with Matchers {
-  val testConfig = ConfigFactory.parseString(
+class FilterSuite extends FunSuite {
+  private val testConfig = ConfigFactory.parseString(
     """
       |kamon.util.filters {
       |
@@ -50,42 +49,39 @@ class FilterSpec extends AnyWordSpec with Matchers {
     """.stripMargin
   )
 
-  Kamon.reconfigure(testConfig.withFallback(Kamon.config()))
+  private val configured = Kamon.reconfigure(testConfig.withFallback(Kamon.config()))
 
-  "the entity filters" should {
-    "reject anything that doesn't match any configured filter" in {
-      Kamon.filter("kamon.util.filters.not-a-filter").accept("hello") shouldBe false
-    }
+  test("reject anything that doesn't match any configured filter") {
+    assert(!Kamon.filter("kamon.util.filters.not-a-filter").accept("hello"))
+  }
 
-    "evaluate patterns for filters with includes and excludes" in {
-      val filter = Kamon.filter("kamon.util.filters.some-filter")
-      filter.accept("anything") shouldBe true
-      filter.accept("some-other") shouldBe true
-      filter.accept("not-me") shouldBe false
-    }
+  test("evaluate patterns for filters with includes and excludes") {
+    val filter = Kamon.filter("kamon.util.filters.some-filter")
+    assert(filter.accept("anything"))
+    assert(filter.accept("some-other"))
+    assert(!filter.accept("not-me"))
+  }
 
-    "allow configuring includes only or excludes only for any filter" in {
-      val filter = Kamon.filter("kamon.util.filters.only-includes")
-      filter.accept("only-me") shouldBe true
-      filter.accept("anything") shouldBe false
-      filter.accept("any-other") shouldBe false
-      filter.accept("not-me") shouldBe false
-    }
+  test("allow configuring includes only or excludes only for any filter") {
+    val filter = Kamon.filter("kamon.util.filters.only-includes")
+    assert(filter.accept("only-me"))
+    assert(!filter.accept("anything"))
+    assert(!filter.accept("any-other"))
+    assert(!filter.accept("not-me"))
+  }
 
-    "allow to explicitly decide whether patterns are treated as Glob or Regex" in {
-      val filter = Kamon.filter("kamon.util.filters.specific-rules")
-      filter.accept("/user/accepted") shouldBe true
-      filter.accept("/other/rejected/") shouldBe false
-      filter.accept("test-5") shouldBe true
-      filter.accept("test-6") shouldBe false
-    }
+  test("allow to explicitly decide whether patterns are treated as Glob or Regex") {
+    val filter = Kamon.filter("kamon.util.filters.specific-rules")
+    assert(filter.accept("/user/accepted"))
+    assert(!filter.accept("/other/rejected/"))
+    assert(filter.accept("test-5"))
+    assert(!filter.accept("test-6"))
+  }
 
-    "allow filters with quoted names" in {
-      val filter = Kamon.filter("kamon.util.filters.\"filter.with.quotes\"")
-      filter.accept("anything") shouldBe true
-      filter.accept("some-other") shouldBe true
-      filter.accept("not-me") shouldBe false
-    }
-
+  test("allow filters with quoted names") {
+    val filter = Kamon.filter("kamon.util.filters.\"filter.with.quotes\"")
+    assert(filter.accept("anything"))
+    assert(filter.accept("some-other"))
+    assert(!filter.accept("not-me"))
   }
 }

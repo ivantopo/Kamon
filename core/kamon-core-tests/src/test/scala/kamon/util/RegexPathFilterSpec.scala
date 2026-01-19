@@ -16,45 +16,40 @@
 
 package kamon.util
 
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class RegexPathFilterSpec extends AnyWordSpec with Matchers {
-  "The RegexPathFilter" should {
+class RegexPathFilterSuite extends FunSuite {
+  test("match a single expression") {
+    val filter = Filter.Regex("/user/actor")
 
-    "match a single expression" in {
-      val filter = Filter.Regex("/user/actor")
+    assert(filter.accept("/user/actor"))
+    assert(!filter.accept("/user/actor/something"))
+    assert(!filter.accept("/user/actor/somethingElse"))
+  }
 
-      filter.accept("/user/actor") shouldBe true
+  test("match arbitrary expressions ending with wildcard") {
+    val filter = Filter.Regex("/user/.*")
 
-      filter.accept("/user/actor/something") shouldBe false
-      filter.accept("/user/actor/somethingElse") shouldBe false
-    }
+    assert(filter.accept("/user/actor"))
+    assert(filter.accept("/user/otherActor"))
+    assert(filter.accept("/user/something/actor"))
+    assert(filter.accept("/user/something/otherActor"))
 
-    "match arbitray expressions ending with wildcard" in {
-      val filter = Filter.Regex("/user/.*")
+    assert(!filter.accept("/otheruser/actor"))
+    assert(!filter.accept("/otheruser/otherActor"))
+    assert(!filter.accept("/otheruser/something/actor"))
+    assert(!filter.accept("/otheruser/something/otherActor"))
+  }
 
-      filter.accept("/user/actor") shouldBe true
-      filter.accept("/user/otherActor") shouldBe true
-      filter.accept("/user/something/actor") shouldBe true
-      filter.accept("/user/something/otherActor") shouldBe true
+  test("match numbers") {
+    val filter = Filter.Regex("/user/actor-\\d")
 
-      filter.accept("/otheruser/actor") shouldBe false
-      filter.accept("/otheruser/otherActor") shouldBe false
-      filter.accept("/otheruser/something/actor") shouldBe false
-      filter.accept("/otheruser/something/otherActor") shouldBe false
-    }
+    assert(filter.accept("/user/actor-1"))
+    assert(filter.accept("/user/actor-2"))
+    assert(filter.accept("/user/actor-3"))
 
-    "match numbers" in {
-      val filter = Filter.Regex("/user/actor-\\d")
-
-      filter.accept("/user/actor-1") shouldBe true
-      filter.accept("/user/actor-2") shouldBe true
-      filter.accept("/user/actor-3") shouldBe true
-
-      filter.accept("/user/actor-one") shouldBe false
-      filter.accept("/user/actor-two") shouldBe false
-      filter.accept("/user/actor-tree") shouldBe false
-    }
+    assert(!filter.accept("/user/actor-one"))
+    assert(!filter.accept("/user/actor-two"))
+    assert(!filter.accept("/user/actor-tree"))
   }
 }

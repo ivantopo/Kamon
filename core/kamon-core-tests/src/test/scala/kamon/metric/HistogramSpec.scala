@@ -18,95 +18,92 @@ package kamon.metric
 import kamon.Kamon
 import kamon.metric.MeasurementUnit._
 import kamon.testkit.InstrumentInspection
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class HistogramSpec extends AnyWordSpec with Matchers with InstrumentInspection.Syntax {
+class HistogramSuite extends FunSuite with InstrumentInspection.Syntax {
 
-  "a Histogram" should {
-    "record values and reset internal state when a snapshot is taken" in {
-      val histogram = Kamon.histogram("test", unit = time.nanoseconds).withoutTags()
-      histogram.record(100)
-      histogram.record(150, 998)
-      histogram.record(200)
+  test("record values and reset internal state when a snapshot is taken") {
+    val histogram = Kamon.histogram("test", unit = time.nanoseconds).withoutTags()
+    histogram.record(100)
+    histogram.record(150, 998)
+    histogram.record(200)
 
-      val distribution = histogram.distribution()
-      distribution.min shouldBe (100)
-      distribution.max shouldBe (200)
-      distribution.count shouldBe (1000)
-      distribution.buckets.length shouldBe 3
-      distribution.buckets.map(b => (b.value, b.frequency)) should contain.allOf(
-        (100 -> 1),
-        (150 -> 998),
-        (200 -> 1)
-      )
+    val distribution = histogram.distribution()
+    assertEquals(distribution.min, 100L)
+    assertEquals(distribution.max, 200L)
+    assertEquals(distribution.count, 1000L)
+    assertEquals(distribution.buckets.length, 3)
 
-      val emptyDistribution = histogram.distribution()
-      emptyDistribution.min shouldBe (0)
-      emptyDistribution.max shouldBe (0)
-      emptyDistribution.count shouldBe (0)
-      emptyDistribution.buckets.length shouldBe 0
+    val bucketValues = distribution.buckets.map(b => (b.value, b.frequency)).toSet
+    assert(bucketValues.contains((100L, 1L)))
+    assert(bucketValues.contains((150L, 998L)))
+    assert(bucketValues.contains((200L, 1L)))
+
+    val emptyDistribution = histogram.distribution()
+    assertEquals(emptyDistribution.min, 0L)
+    assertEquals(emptyDistribution.max, 0L)
+    assertEquals(emptyDistribution.count, 0L)
+    assertEquals(emptyDistribution.buckets.length, 0)
+  }
+
+  test("accept a smallest discernible value configuration") {
+    // The lowestDiscernibleValue gets rounded down to the closest power of 2, so, here it will be 64.
+    val histogram = Kamon.histogram(
+      "test-lowest-discernible-value",
+      unit = time.nanoseconds,
+      dynamicRange = DynamicRange.Fine.withLowestDiscernibleValue(100)
+    ).withoutTags()
+    histogram.record(100)
+    histogram.record(200)
+    histogram.record(300)
+    histogram.record(1000)
+    histogram.record(2000)
+    histogram.record(3000)
+
+    val distribution = histogram.distribution()
+    assertEquals(distribution.min, 64L)
+    assertEquals(distribution.max, 2944L)
+    assertEquals(distribution.count, 6L)
+    assertEquals(distribution.buckets.length, 6)
+
+    val bucketValues = distribution.buckets.map(b => (b.value, b.frequency)).toSet
+    assert(bucketValues.contains((64L, 1L)))
+    assert(bucketValues.contains((192L, 1L)))
+    assert(bucketValues.contains((256L, 1L)))
+    assert(bucketValues.contains((960L, 1L)))
+    assert(bucketValues.contains((1984L, 1L)))
+    assert(bucketValues.contains((2944L, 1L)))
+  }
+
+  test("return the same percentile value that was requested on a resulting distribution") {
+    val histogram = Kamon.histogram("returned-percentile").withoutTags()
+    (1L to 10L).foreach(histogram.record)
+
+    val distribution = histogram.distribution()
+    assertEquals(distribution.percentile(99).rank, 99.0)
+    assertEquals(distribution.percentile(99.9).rank, 99.9)
+    assertEquals(distribution.percentile(99.99).rank, 99.99)
+  }
+
+  test("[private api] record values and optionally keep the internal state when a snapshot is taken") {
+    val histogram = Kamon.histogram("test-keep-state", unit = time.nanoseconds).withoutTags()
+    histogram.record(100)
+    histogram.record(150, 998)
+    histogram.record(200)
+
+    val distribution = {
+      histogram.distribution(resetState = false) // first one gets discarded
+      histogram.distribution(resetState = false)
     }
 
-    "accept a smallest discernible value configuration" in {
-      // The lowestDiscernibleValue gets rounded down to the closest power of 2, so, here it will be 64.
-      val histogram = Kamon.histogram(
-        "test-lowest-discernible-value",
-        unit = time.nanoseconds,
-        dynamicRange = DynamicRange.Fine.withLowestDiscernibleValue(100)
-      ).withoutTags()
-      histogram.record(100)
-      histogram.record(200)
-      histogram.record(300)
-      histogram.record(1000)
-      histogram.record(2000)
-      histogram.record(3000)
+    assertEquals(distribution.min, 100L)
+    assertEquals(distribution.max, 200L)
+    assertEquals(distribution.count, 1000L)
+    assertEquals(distribution.buckets.length, 3)
 
-      val distribution = histogram.distribution()
-      distribution.min shouldBe (64)
-      distribution.max shouldBe (2944)
-      distribution.count shouldBe (6)
-      distribution.buckets.length shouldBe 6
-      distribution.buckets.map(b => (b.value, b.frequency)) should contain.allOf(
-        (64 -> 1),
-        (192 -> 1),
-        (256 -> 1),
-        (960 -> 1),
-        (1984 -> 1),
-        (2944 -> 1)
-      )
-    }
-
-    "return the same percentile value that was request on a resulting distribution" in {
-      val histogram = Kamon.histogram("returned-percentile").withoutTags()
-      (1L to 10L).foreach(histogram.record)
-
-      val distribution = histogram.distribution()
-      distribution.percentile(99).rank shouldBe (99)
-      distribution.percentile(99.9).rank shouldBe (99.9)
-      distribution.percentile(99.99).rank shouldBe (99.99d)
-    }
-
-    "[private api] record values and optionally keep the internal state when a snapshot is taken" in {
-      val histogram = Kamon.histogram("test", unit = time.nanoseconds).withoutTags()
-      histogram.record(100)
-      histogram.record(150, 998)
-      histogram.record(200)
-
-      val distribution = {
-        histogram.distribution(resetState = false) // first one gets discarded
-        histogram.distribution(resetState = false)
-      }
-
-      distribution.min shouldBe (100)
-      distribution.max shouldBe (200)
-      distribution.count shouldBe (1000)
-      distribution.buckets.length shouldBe 3
-      distribution.buckets.map(b => (b.value, b.frequency)) should contain.allOf(
-        (100 -> 1),
-        (150 -> 998),
-        (200 -> 1)
-      )
-    }
+    val bucketValues = distribution.buckets.map(b => (b.value, b.frequency)).toSet
+    assert(bucketValues.contains((100L, 1L)))
+    assert(bucketValues.contains((150L, 998L)))
+    assert(bucketValues.contains((200L, 1L)))
   }
 }

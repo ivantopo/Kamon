@@ -6,114 +6,110 @@ import kamon.context.BinaryPropagation.{ByteStreamReader, ByteStreamWriter}
 import kamon.context.Propagation.{EntryReader, EntryWriter}
 import kamon.tag.TagSet
 import kamon.tag.Lookups._
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.OptionValues
+import munit.FunSuite
 
 import scala.util.Random
 
-class BinaryPropagationSpec extends AnyWordSpec with Matchers with OptionValues {
+class BinaryPropagationSpec extends FunSuite {
 
-  "The Binary Context Propagation" should {
-    "return an empty context if there is no data to read from" in {
-      val context = binaryPropagation.read(ByteStreamReader.of(Array.ofDim[Byte](0)))
-      context.isEmpty() shouldBe true
-    }
-
-    "not write any data to the medium if the context is empty" in {
-      val writer = inspectableByteStreamWriter()
-      binaryPropagation.write(Context.Empty, writer)
-      writer.size() shouldBe 0
-    }
-
-    "handle malformed data in when reading a context" in {
-      val randomBytes = Array.ofDim[Byte](42)
-      Random.nextBytes(randomBytes)
-
-      val context = binaryPropagation.read(ByteStreamReader.of(randomBytes))
-      context.isEmpty() shouldBe true
-    }
-
-    "handle read failures in an entry reader" in {
-      val context = Context.of(
-        BinaryPropagationSpec.StringKey,
-        "string-value",
-        BinaryPropagationSpec.FailStringKey,
-        "fail-read"
-      )
-      val writer = inspectableByteStreamWriter()
-      binaryPropagation.write(context, writer)
-
-      val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
-      rtContext.tags.get(plain("upstream.name")) shouldBe "kamon-application"
-      rtContext.get(BinaryPropagationSpec.StringKey) shouldBe "string-value"
-      rtContext.get(BinaryPropagationSpec.FailStringKey) shouldBe null
-    }
-
-    "handle write failures in an entry writer" in {
-      val context = Context.of(
-        BinaryPropagationSpec.StringKey,
-        "string-value",
-        BinaryPropagationSpec.FailStringKey,
-        "fail-write"
-      )
-      val writer = inspectableByteStreamWriter()
-      binaryPropagation.write(context, writer)
-
-      val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
-      rtContext.tags.get(plain("upstream.name")) shouldBe "kamon-application"
-      rtContext.get(BinaryPropagationSpec.StringKey) shouldBe "string-value"
-      rtContext.get(BinaryPropagationSpec.FailStringKey) shouldBe null
-    }
-
-    "handle write failures in an entry writer when the context is too big" in {
-      val context = Context.of(BinaryPropagationSpec.StringKey, "string-value" * 20)
-      val writer = inspectableByteStreamWriter()
-      binaryPropagation.write(context, writer)
-
-      val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
-      rtContext shouldBe empty
-    }
-
-    "round trip a Context that only has tags" in {
-      val context = Context.of(TagSet.from(Map("hello" -> "world", "kamon" -> "rulez")))
-      val writer = inspectableByteStreamWriter()
-      binaryPropagation.write(context, writer)
-
-      val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
-      rtContext.entries shouldBe empty
-      rtContext.tags.get(plain("hello")) shouldBe "world"
-      rtContext.tags.get(plain("kamon")) shouldBe "rulez"
-    }
-
-    "round trip a Context that only has entries" in {
-      val context = Context.of(BinaryPropagationSpec.StringKey, "string-value", BinaryPropagationSpec.IntegerKey, 42)
-      val writer = inspectableByteStreamWriter()
-      binaryPropagation.write(context, writer)
-
-      val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
-      rtContext.tags.get(plain("upstream.name")) shouldBe "kamon-application"
-      rtContext.get(BinaryPropagationSpec.StringKey) shouldBe "string-value"
-      rtContext.get(BinaryPropagationSpec.IntegerKey) shouldBe 0 // there is no entry configuration for the integer key
-    }
-
-    "round trip a Context that with tags and entries" in {
-      val context = Context.of(TagSet.from(Map("hello" -> "world", "kamon" -> "rulez")))
-        .withEntry(BinaryPropagationSpec.StringKey, "string-value")
-        .withEntry(BinaryPropagationSpec.IntegerKey, 42)
-
-      val writer = inspectableByteStreamWriter()
-      binaryPropagation.write(context, writer)
-      val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
-
-      rtContext.tags.get(plain("hello")) shouldBe "world"
-      rtContext.tags.get(plain("kamon")) shouldBe "rulez"
-      rtContext.get(BinaryPropagationSpec.StringKey) shouldBe "string-value"
-      rtContext.get(BinaryPropagationSpec.IntegerKey) shouldBe 0 // there is no entry configuration for the integer key
-    }
+  test("reading returns an empty context if there is no data") {
+    val context = binaryPropagation.read(ByteStreamReader.of(Array.ofDim[Byte](0)))
+    assert(context.isEmpty())
   }
 
-  val binaryPropagation = BinaryPropagation.from(
+  test("writing an empty context produces no data") {
+    val writer = inspectableByteStreamWriter()
+    binaryPropagation.write(Context.Empty, writer)
+    assertEquals(writer.size(), 0)
+  }
+
+  test("reading handles malformed data") {
+    val randomBytes = Array.ofDim[Byte](42)
+    Random.nextBytes(randomBytes)
+
+    val context = binaryPropagation.read(ByteStreamReader.of(randomBytes))
+    assert(context.isEmpty())
+  }
+
+  test("reading handles entry reader errors") {
+    val context = Context.of(
+      BinaryPropagationSpec.StringKey,
+      "string-value",
+      BinaryPropagationSpec.FailStringKey,
+      "fail-read"
+    )
+    val writer = inspectableByteStreamWriter()
+    binaryPropagation.write(context, writer)
+
+    val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
+    assertEquals(rtContext.tags.get(plain("upstream.name")), "kamon-application")
+    assertEquals(rtContext.get(BinaryPropagationSpec.StringKey), "string-value")
+    assertEquals(rtContext.get(BinaryPropagationSpec.FailStringKey), null)
+  }
+
+  test("writing handles entry writer errors") {
+    val context = Context.of(
+      BinaryPropagationSpec.StringKey,
+      "string-value",
+      BinaryPropagationSpec.FailStringKey,
+      "fail-write"
+    )
+    val writer = inspectableByteStreamWriter()
+    binaryPropagation.write(context, writer)
+
+    val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
+    assertEquals(rtContext.tags.get(plain("upstream.name")), "kamon-application")
+    assertEquals(rtContext.get(BinaryPropagationSpec.StringKey), "string-value")
+    assertEquals(rtContext.get(BinaryPropagationSpec.FailStringKey), null)
+  }
+
+  test("writing fails gracefully when context exceeds max size") {
+    val context = Context.of(BinaryPropagationSpec.StringKey, "string-value" * 20)
+    val writer = inspectableByteStreamWriter()
+    binaryPropagation.write(context, writer)
+
+    val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
+    assert(rtContext.isEmpty())
+  }
+
+  test("round-trip tags only") {
+    val context = Context.of(TagSet.from(Map("hello" -> "world", "kamon" -> "rulez")))
+    val writer = inspectableByteStreamWriter()
+    binaryPropagation.write(context, writer)
+
+    val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
+    assert(rtContext.entries.isEmpty)
+    assertEquals(rtContext.tags.get(plain("hello")), "world")
+    assertEquals(rtContext.tags.get(plain("kamon")), "rulez")
+  }
+
+  test("round-trip entries only") {
+    val context = Context.of(BinaryPropagationSpec.StringKey, "string-value", BinaryPropagationSpec.IntegerKey, 42)
+    val writer = inspectableByteStreamWriter()
+    binaryPropagation.write(context, writer)
+
+    val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
+    assertEquals(rtContext.tags.get(plain("upstream.name")), "kamon-application")
+    assertEquals(rtContext.get(BinaryPropagationSpec.StringKey), "string-value")
+    assertEquals(rtContext.get(BinaryPropagationSpec.IntegerKey), 0)
+  }
+
+  test("round-trip tags and entries") {
+    val context = Context.of(TagSet.from(Map("hello" -> "world", "kamon" -> "rulez")))
+      .withEntry(BinaryPropagationSpec.StringKey, "string-value")
+      .withEntry(BinaryPropagationSpec.IntegerKey, 42)
+
+    val writer = inspectableByteStreamWriter()
+    binaryPropagation.write(context, writer)
+    val rtContext = binaryPropagation.read(ByteStreamReader.of(writer.toByteArray))
+
+    assertEquals(rtContext.tags.get(plain("hello")), "world")
+    assertEquals(rtContext.tags.get(plain("kamon")), "rulez")
+    assertEquals(rtContext.get(BinaryPropagationSpec.StringKey), "string-value")
+    assertEquals(rtContext.get(BinaryPropagationSpec.IntegerKey), 0)
+  }
+
+  private val binaryPropagation = BinaryPropagation.from(
     ConfigFactory.parseString(
       """
         |max-outgoing-size = 128
@@ -127,7 +123,7 @@ class BinaryPropagationSpec extends AnyWordSpec with Matchers with OptionValues 
     ).withFallback(ConfigFactory.load().getConfig("kamon.propagation"))
   )
 
-  def inspectableByteStreamWriter() = new ByteArrayOutputStream(32) with ByteStreamWriter
+  private def inspectableByteStreamWriter() = new ByteArrayOutputStream(32) with ByteStreamWriter
 
 }
 
@@ -175,7 +171,7 @@ object BinaryPropagationSpec {
       if (value != null && value != "fail-write") {
         medium.write(value.getBytes)
       } else {
-        medium.write(42) // malformed data on purpose
+        medium.write(42)
         sys.error("The fail string entry writer has triggered")
       }
     }

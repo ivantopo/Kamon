@@ -85,7 +85,10 @@ lazy val `kamon-status-page` = (project in file("core/kamon-status-page"))
 lazy val `kamon-testkit` = (project in file("core/kamon-testkit"))
   .disablePlugins(AssemblyPlugin)
   .settings(
-    libraryDependencies += scalatest % "provided,test"
+    libraryDependencies ++= Seq(
+      scalatest % "provided,test",
+      munit % "provided,test"
+    )
   ).dependsOn(`kamon-core`)
 
 lazy val `kamon-core-tests` = (project in file("core/kamon-core-tests"))
@@ -94,6 +97,7 @@ lazy val `kamon-core-tests` = (project in file("core/kamon-core-tests"))
   .settings(
     libraryDependencies ++= Seq(
       scalatest % "test",
+      munit % "test",
       logbackClassic % "test"
     )
   ).dependsOn(`kamon-testkit`)

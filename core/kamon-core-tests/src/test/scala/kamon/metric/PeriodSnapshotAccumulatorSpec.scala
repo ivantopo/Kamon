@@ -19,180 +19,205 @@ import kamon.Kamon
 import kamon.tag.TagSet
 import kamon.testkit.{InstrumentInspection, Reconfigure}
 import kamon.util.Clock
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.{BeforeAndAfterAll, OptionValues}
+import munit.FunSuite
 
 import java.time.{Duration, Instant}
 
-class PeriodSnapshotAccumulatorSpec extends AnyWordSpec with Matchers with Reconfigure with InstrumentInspection.Syntax
-    with BeforeAndAfterAll with OptionValues {
+class PeriodSnapshotAccumulatorSuite extends FunSuite with Reconfigure with InstrumentInspection.Syntax {
 
-  "the PeriodSnapshotAccumulator" should {
-    "allow to peek on an empty accumulator" in {
-      val accumulator = newAccumulator(10, 1)
-      val periodSnapshot = accumulator.peek()
-      periodSnapshot.histograms shouldBe empty
-      periodSnapshot.timers shouldBe empty
-      periodSnapshot.rangeSamplers shouldBe empty
-      periodSnapshot.gauges shouldBe empty
-      periodSnapshot.counters shouldBe empty
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    applyConfig("kamon.metric.tick-interval = 10 seconds")
+  }
+
+  val alignedZeroTime: Instant = Clock.nextAlignedInstant(Kamon.clock().instant(), Duration.ofSeconds(60)).minusSeconds(60)
+  val unAlignedZeroTime: Instant = alignedZeroTime.plusSeconds(3)
+
+  // Aligned snapshots, every 5 seconds from second 00.
+  val fiveSecondsOne: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(5), 22)
+  val fiveSecondsTwo: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime.plusSeconds(5), alignedZeroTime.plusSeconds(10), 33)
+  val fiveSecondsThree: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime.plusSeconds(10), alignedZeroTime.plusSeconds(15), 12)
+  val fiveSecondsFour: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime.plusSeconds(15), alignedZeroTime.plusSeconds(20), 37)
+  val fiveSecondsFive: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime.plusSeconds(20), alignedZeroTime.plusSeconds(25), 54)
+  val fiveSecondsSix: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime.plusSeconds(25), alignedZeroTime.plusSeconds(30), 63)
+  val fiveSecondsSeven: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime.plusSeconds(30), alignedZeroTime.plusSeconds(35), 62)
+
+  // Unaligned snapshots, every 10 seconds from second 03
+  val tenSecondsOne: PeriodSnapshot = createPeriodSnapshot(unAlignedZeroTime, unAlignedZeroTime.plusSeconds(10), 22)
+  val tenSecondsTwo: PeriodSnapshot = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(10), unAlignedZeroTime.plusSeconds(20), 33)
+  val tenSecondsThree: PeriodSnapshot = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(20), unAlignedZeroTime.plusSeconds(30), 12)
+  val tenSecondsFour: PeriodSnapshot = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(30), unAlignedZeroTime.plusSeconds(40), 37)
+  val tenSecondsFive: PeriodSnapshot = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(40), unAlignedZeroTime.plusSeconds(50), 54)
+  val tenSecondsSix: PeriodSnapshot = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(50), unAlignedZeroTime.plusSeconds(60), 63)
+
+  val almostThreeSeconds: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(3).minusMillis(1), 22)
+  val threeSeconds: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(3), 22)
+  val fourSeconds: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(4), 22)
+  val nineSeconds: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(9), 22)
+  val tenSeconds: PeriodSnapshot = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(10), 36)
+
+  test("allow to peek on an empty accumulator") {
+    val accumulator = newAccumulator(10, 1)
+    val periodSnapshot = accumulator.peek()
+    assert(periodSnapshot.histograms.isEmpty)
+    assert(periodSnapshot.timers.isEmpty)
+    assert(periodSnapshot.rangeSamplers.isEmpty)
+    assert(periodSnapshot.gauges.isEmpty)
+    assert(periodSnapshot.counters.isEmpty)
+  }
+
+  test("bypass accumulation if the configured duration is equal to the metric tick-interval, regardless of the snapshot") {
+    val accumulator = newAccumulator(10, 1)
+    val result1 = accumulator.add(tenSeconds)
+    assert(result1.isDefined)
+    assert(result1.get eq tenSeconds)
+
+    val result2 = accumulator.add(fiveSecondsOne)
+    assert(result2.isDefined)
+    assert(result2.get eq fiveSecondsOne)
+  }
+
+  test("bypass accumulation if snapshots are beyond the expected next tick") {
+    val accumulator = newAccumulator(4, 1)
+    assert(accumulator.add(almostThreeSeconds).isEmpty)
+    assert(accumulator.add(fourSeconds).isDefined)
+
+    val result = accumulator.add(nineSeconds)
+    assert(result.isDefined)
+    assert(result.get eq nineSeconds)
+  }
+
+  test("remove snapshots once they have been flushed") {
+    val accumulator = newAccumulator(15, 0)
+
+    assert(accumulator.add(fiveSecondsOne).isEmpty)
+    assert(accumulator.add(fiveSecondsTwo).isEmpty)
+    val firstSnapshot = accumulator.add(fiveSecondsThree)
+    assert(firstSnapshot.isDefined)
+
+    assertEquals(firstSnapshot.get.counters.size, 1)
+    assertEquals(firstSnapshot.get.gauges.size, 1)
+    assertEquals(firstSnapshot.get.histograms.size, 1)
+    assertEquals(firstSnapshot.get.timers.size, 1)
+    assertEquals(firstSnapshot.get.rangeSamplers.size, 1)
+
+    assert(accumulator.add(clear(fiveSecondsFour)).isEmpty)
+    assert(accumulator.add(clear(fiveSecondsFive)).isEmpty)
+    val secondSnapshot = accumulator.add(clear(fiveSecondsSix))
+    assert(secondSnapshot.isDefined)
+
+    assertEquals(secondSnapshot.get.counters.size, 0)
+    assertEquals(secondSnapshot.get.gauges.size, 0)
+    assertEquals(secondSnapshot.get.histograms.size, 0)
+    assertEquals(secondSnapshot.get.timers.size, 0)
+    assertEquals(secondSnapshot.get.rangeSamplers.size, 0)
+  }
+
+  test("align snapshot production to round boundaries") {
+    // If accumulating over 15 seconds, the snapshots should be generated at 00:00:00, 00:00:15, 00:00:30 and so on.
+    // The first snapshot will almost always be shorter than 15 seconds as it gets adjusted to the nearest initial period.
+
+    val accumulator = newAccumulator(15, 0)
+    assert(accumulator.add(fiveSecondsTwo).isEmpty) // second 0:10
+    val s15 = accumulator.add(fiveSecondsThree) // second 0:15
+    assert(s15.isDefined)
+    assertEquals(s15.get.from, fiveSecondsTwo.from)
+    assertEquals(s15.get.to, fiveSecondsThree.to)
+
+    assert(accumulator.add(fiveSecondsFour).isEmpty) // second 0:20
+    assert(accumulator.add(fiveSecondsFive).isEmpty) // second 0:25
+    val s30 = accumulator.add(fiveSecondsSix) // second 0:30
+    assert(s30.isDefined)
+    assertEquals(s30.get.from, fiveSecondsFour.from)
+    assertEquals(s30.get.to, fiveSecondsSix.to)
+
+    assert(accumulator.add(fiveSecondsSeven).isEmpty) // second 0:35
+  }
+
+  test("do best effort to align when snapshots themselves are not aligned") {
+    val accumulator = newAccumulator(30, 0)
+    assert(accumulator.add(tenSecondsOne).isEmpty) // second 0:13
+    assert(accumulator.add(tenSecondsTwo).isEmpty) // second 0:23
+    val s23 = accumulator.add(tenSecondsThree) // second 0:33
+    assert(s23.isDefined)
+    assertEquals(s23.get.from, tenSecondsOne.from)
+    assertEquals(s23.get.to, tenSecondsThree.to)
+
+    assert(accumulator.add(tenSecondsFour).isEmpty) // second 0:43
+    assert(accumulator.add(tenSecondsFive).isEmpty) // second 0:53
+    val s103 = accumulator.add(tenSecondsSix) // second 1:03
+    assert(s103.isDefined)
+    assertEquals(s103.get.from, tenSecondsFour.from)
+    assertEquals(s103.get.to, tenSecondsSix.to)
+
+    assert(accumulator.add(fiveSecondsSeven).isEmpty) // second 1:13
+  }
+
+  test("allow to peek into the data that has been accumulated") {
+    val accumulator = newAccumulator(20, 1)
+    assert(accumulator.add(fiveSecondsOne).isEmpty)
+    assert(accumulator.add(fiveSecondsTwo).isEmpty)
+
+    for (_ <- 1 to 10) {
+      val peekSnapshot = accumulator.peek()
+      val mergedHistogram = peekSnapshot.histograms.find(_.name == "histogram").get.instruments.head.value
+      val mergedRangeSampler = peekSnapshot.rangeSamplers.find(_.name == "rangeSampler").get.instruments.head.value
+      assertEquals(peekSnapshot.counters.find(_.name == "counter").get.instruments.head.value, 55L)
+      assertEquals(peekSnapshot.gauges.find(_.name == "gauge").get.instruments.head.value, 33.0)
+      assert(mergedHistogram.buckets.map(_.value).contains(22L))
+      assert(mergedHistogram.buckets.map(_.value).contains(33L))
+      assert(mergedRangeSampler.buckets.map(_.value).contains(22L))
+      assert(mergedRangeSampler.buckets.map(_.value).contains(33L))
     }
 
-    "bypass accumulation if the configured duration is equal to the metric tick-interval, regardless of the snapshot" in {
-      val accumulator = newAccumulator(10, 1)
-      accumulator.add(tenSeconds).value should be theSameInstanceAs (tenSeconds)
-      accumulator.add(fiveSecondsOne).value should be theSameInstanceAs (fiveSecondsOne)
-    }
+    assert(accumulator.add(fiveSecondsThree).isEmpty)
 
-    "bypass accumulation if snapshots are beyond the expected next tick" in {
-      val accumulator = newAccumulator(4, 1)
-      accumulator.add(almostThreeSeconds) shouldBe empty
-      accumulator.add(fourSeconds) shouldBe defined
-      accumulator.add(nineSeconds).value should be theSameInstanceAs (nineSeconds)
-    }
-
-    "remove snapshots once they have been flushed" in {
-      val accumulator = newAccumulator(15, 0)
-
-      accumulator.add(fiveSecondsOne) shouldBe empty
-      accumulator.add(fiveSecondsTwo) shouldBe empty
-      val firstSnapshot = accumulator.add(fiveSecondsThree).value
-
-      firstSnapshot.counters.size shouldBe 1
-      firstSnapshot.gauges.size shouldBe 1
-      firstSnapshot.histograms.size shouldBe 1
-      firstSnapshot.timers.size shouldBe 1
-      firstSnapshot.rangeSamplers.size shouldBe 1
-
-      accumulator.add(clear(fiveSecondsFour)) shouldBe empty
-      accumulator.add(clear(fiveSecondsFive)) shouldBe empty
-      val secondSnapshot = accumulator.add(clear(fiveSecondsSix)).value
-
-      secondSnapshot.counters.size shouldBe 0
-      secondSnapshot.gauges.size shouldBe 0
-      secondSnapshot.histograms.size shouldBe 0
-      secondSnapshot.timers.size shouldBe 0
-      secondSnapshot.rangeSamplers.size shouldBe 0
-    }
-
-    "align snapshot production to round boundaries" in {
-      // If accumulating over 15 seconds, the snapshots should be generated at 00:00:00, 00:00:15, 00:00:30 and so on.
-      // The first snapshot will almost always be shorter than 15 seconds as it gets adjusted to the nearest initial period.
-
-      val accumulator = newAccumulator(15, 0)
-      accumulator.add(fiveSecondsTwo) shouldBe empty // second 0:10
-      val s15 = accumulator.add(fiveSecondsThree).value // second 0:15
-      s15.from shouldBe (fiveSecondsTwo.from)
-      s15.to shouldBe (fiveSecondsThree.to)
-
-      accumulator.add(fiveSecondsFour) shouldBe empty // second 0:20
-      accumulator.add(fiveSecondsFive) shouldBe empty // second 0:25
-      val s30 = accumulator.add(fiveSecondsSix).value // second 0:30
-      s30.from shouldBe (fiveSecondsFour.from)
-      s30.to shouldBe (fiveSecondsSix.to)
-
-      accumulator.add(fiveSecondsSeven) shouldBe empty // second 0:35
-    }
-
-    "do best effort to align when snapshots themselves are not aligned" in {
-      val accumulator = newAccumulator(30, 0)
-      accumulator.add(tenSecondsOne) shouldBe empty // second 0:13
-      accumulator.add(tenSecondsTwo) shouldBe empty // second 0:23
-      val s23 = accumulator.add(tenSecondsThree).value // second 0:33
-      s23.from shouldBe (tenSecondsOne.from)
-      s23.to shouldBe (tenSecondsThree.to)
-
-      accumulator.add(tenSecondsFour) shouldBe empty // second 0:43
-      accumulator.add(tenSecondsFive) shouldBe empty // second 0:53
-      val s103 = accumulator.add(tenSecondsSix).value // second 1:03
-      s103.from shouldBe (tenSecondsFour.from)
-      s103.to shouldBe (tenSecondsSix.to)
-
-      accumulator.add(fiveSecondsSeven) shouldBe empty // second 1:13
-    }
-
-    "allow to peek into the data that has been accumulated" in {
-      val accumulator = newAccumulator(20, 1)
-      accumulator.add(fiveSecondsOne) shouldBe empty
-      accumulator.add(fiveSecondsTwo) shouldBe empty
-
-      for (_ <- 1 to 10) {
-        val peekSnapshot = accumulator.peek()
-        val mergedHistogram = peekSnapshot.histograms.find(_.name == "histogram").get.instruments.head.value
-        val mergedRangeSampler = peekSnapshot.rangeSamplers.find(_.name == "rangeSampler").get.instruments.head.value
-        peekSnapshot.counters.find(_.name == "counter").get.instruments.head.value shouldBe (55)
-        peekSnapshot.gauges.find(_.name == "gauge").get.instruments.head.value shouldBe (33)
-        mergedHistogram.buckets.map(_.value) should contain allOf (22L, 33L)
-        mergedRangeSampler.buckets.map(_.value) should contain allOf (22L, 33L)
-      }
-
-      accumulator.add(fiveSecondsThree) shouldBe empty
-
-      for (_ <- 1 to 10) {
-        val peekSnapshot = accumulator.peek()
-        val mergedHistogram = peekSnapshot.histograms.find(_.name == "histogram").get.instruments.head.value
-        val mergedRangeSampler = peekSnapshot.rangeSamplers.find(_.name == "rangeSampler").get.instruments.head.value
-        peekSnapshot.counters.find(_.name == "counter").get.instruments.head.value shouldBe (67)
-        peekSnapshot.gauges.find(_.name == "gauge").get.instruments.head.value shouldBe (12)
-        mergedHistogram.buckets.map(_.value) should contain allOf (22L, 33L, 12L)
-        mergedRangeSampler.buckets.map(_.value) should contain allOf (22L, 33L, 12L)
-      }
-    }
-
-    "produce a snapshot when enough data has been accumulated" in {
-      val accumulator = newAccumulator(15, 1)
-      accumulator.add(fiveSecondsOne) shouldBe empty
-      accumulator.add(fiveSecondsTwo) shouldBe empty
-
-      val snapshotOne = accumulator.add(fiveSecondsThree).value
-      snapshotOne.from shouldBe fiveSecondsOne.from
-      snapshotOne.to shouldBe fiveSecondsThree.to
-
-      val mergedHistogram = snapshotOne.histograms.find(_.name == "histogram").get.instruments.head.value
-      val mergedRangeSampler = snapshotOne.rangeSamplers.find(_.name == "rangeSampler").get.instruments.head.value
-      snapshotOne.counters.find(_.name == "counter").get.instruments.head.value shouldBe (67)
-      snapshotOne.gauges.find(_.name == "gauge").get.instruments.head.value shouldBe (12)
-      mergedHistogram.buckets.map(_.value) should contain allOf (22L, 33L, 12L)
-      mergedRangeSampler.buckets.map(_.value) should contain allOf (22L, 33L, 12L)
-
-      val emptySnapshot = accumulator.peek()
-      emptySnapshot.histograms shouldBe empty
-      emptySnapshot.rangeSamplers shouldBe empty
-      emptySnapshot.gauges shouldBe empty
-      emptySnapshot.counters shouldBe empty
-
-      accumulator.add(fiveSecondsFour) shouldBe empty
+    for (_ <- 1 to 10) {
+      val peekSnapshot = accumulator.peek()
+      val mergedHistogram = peekSnapshot.histograms.find(_.name == "histogram").get.instruments.head.value
+      val mergedRangeSampler = peekSnapshot.rangeSamplers.find(_.name == "rangeSampler").get.instruments.head.value
+      assertEquals(peekSnapshot.counters.find(_.name == "counter").get.instruments.head.value, 67L)
+      assertEquals(peekSnapshot.gauges.find(_.name == "gauge").get.instruments.head.value, 12.0)
+      assert(mergedHistogram.buckets.map(_.value).contains(22L))
+      assert(mergedHistogram.buckets.map(_.value).contains(33L))
+      assert(mergedHistogram.buckets.map(_.value).contains(12L))
+      assert(mergedRangeSampler.buckets.map(_.value).contains(22L))
+      assert(mergedRangeSampler.buckets.map(_.value).contains(33L))
+      assert(mergedRangeSampler.buckets.map(_.value).contains(12L))
     }
   }
 
-  val alignedZeroTime = Clock.nextAlignedInstant(Kamon.clock().instant(), Duration.ofSeconds(60)).minusSeconds(60)
-  val unAlignedZeroTime = alignedZeroTime.plusSeconds(3)
+  test("produce a snapshot when enough data has been accumulated") {
+    val accumulator = newAccumulator(15, 1)
+    assert(accumulator.add(fiveSecondsOne).isEmpty)
+    assert(accumulator.add(fiveSecondsTwo).isEmpty)
 
-  // Aligned snapshots, every 5 seconds from second 00.
-  val fiveSecondsOne = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(5), 22)
-  val fiveSecondsTwo = createPeriodSnapshot(alignedZeroTime.plusSeconds(5), alignedZeroTime.plusSeconds(10), 33)
-  val fiveSecondsThree = createPeriodSnapshot(alignedZeroTime.plusSeconds(10), alignedZeroTime.plusSeconds(15), 12)
-  val fiveSecondsFour = createPeriodSnapshot(alignedZeroTime.plusSeconds(15), alignedZeroTime.plusSeconds(20), 37)
-  val fiveSecondsFive = createPeriodSnapshot(alignedZeroTime.plusSeconds(20), alignedZeroTime.plusSeconds(25), 54)
-  val fiveSecondsSix = createPeriodSnapshot(alignedZeroTime.plusSeconds(25), alignedZeroTime.plusSeconds(30), 63)
-  val fiveSecondsSeven = createPeriodSnapshot(alignedZeroTime.plusSeconds(30), alignedZeroTime.plusSeconds(35), 62)
+    val snapshotOne = accumulator.add(fiveSecondsThree)
+    assert(snapshotOne.isDefined)
+    assertEquals(snapshotOne.get.from, fiveSecondsOne.from)
+    assertEquals(snapshotOne.get.to, fiveSecondsThree.to)
 
-  // Unaligned snapshots, every 10 seconds from second 03
-  val tenSecondsOne = createPeriodSnapshot(unAlignedZeroTime, unAlignedZeroTime.plusSeconds(10), 22)
-  val tenSecondsTwo = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(10), unAlignedZeroTime.plusSeconds(20), 33)
-  val tenSecondsThree = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(20), unAlignedZeroTime.plusSeconds(30), 12)
-  val tenSecondsFour = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(30), unAlignedZeroTime.plusSeconds(40), 37)
-  val tenSecondsFive = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(40), unAlignedZeroTime.plusSeconds(50), 54)
-  val tenSecondsSix = createPeriodSnapshot(unAlignedZeroTime.plusSeconds(50), unAlignedZeroTime.plusSeconds(60), 63)
+    val mergedHistogram = snapshotOne.get.histograms.find(_.name == "histogram").get.instruments.head.value
+    val mergedRangeSampler = snapshotOne.get.rangeSamplers.find(_.name == "rangeSampler").get.instruments.head.value
+    assertEquals(snapshotOne.get.counters.find(_.name == "counter").get.instruments.head.value, 67L)
+    assertEquals(snapshotOne.get.gauges.find(_.name == "gauge").get.instruments.head.value, 12.0)
+    assert(mergedHistogram.buckets.map(_.value).contains(22L))
+    assert(mergedHistogram.buckets.map(_.value).contains(33L))
+    assert(mergedHistogram.buckets.map(_.value).contains(12L))
+    assert(mergedRangeSampler.buckets.map(_.value).contains(22L))
+    assert(mergedRangeSampler.buckets.map(_.value).contains(33L))
+    assert(mergedRangeSampler.buckets.map(_.value).contains(12L))
 
-  val almostThreeSeconds = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(3).minusMillis(1), 22)
-  val threeSeconds = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(3), 22)
-  val fourSeconds = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(4), 22)
-  val nineSeconds = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(9), 22)
-  val tenSeconds = createPeriodSnapshot(alignedZeroTime, alignedZeroTime.plusSeconds(10), 36)
+    val emptySnapshot = accumulator.peek()
+    assert(emptySnapshot.histograms.isEmpty)
+    assert(emptySnapshot.rangeSamplers.isEmpty)
+    assert(emptySnapshot.gauges.isEmpty)
+    assert(emptySnapshot.counters.isEmpty)
 
-  def newAccumulator(duration: Long, margin: Long) =
+    assert(accumulator.add(fiveSecondsFour).isEmpty)
+  }
+
+  def newAccumulator(duration: Long, margin: Long): PeriodSnapshot.Accumulator =
     PeriodSnapshot.accumulator(Duration.ofSeconds(duration), Duration.ofSeconds(margin))
 
   /** Creates a period snapshot with one metric of each type with one instrument. All instruments have a single
@@ -217,7 +242,7 @@ class PeriodSnapshotAccumulatorSpec extends AnyWordSpec with Matchers with Recon
         "gauge",
         "",
         valueSettings,
-        Seq(Instrument.Snapshot(TagSet.of("metric", "gauge"), value))
+        Seq(Instrument.Snapshot(TagSet.of("metric", "gauge"), value.toDouble))
       )),
       histograms = Seq(MetricSnapshot.ofDistributions(
         "histogram",
@@ -248,8 +273,4 @@ class PeriodSnapshotAccumulatorSpec extends AnyWordSpec with Matchers with Recon
       timers = Seq.empty,
       rangeSamplers = Seq.empty
     )
-
-  override protected def beforeAll(): Unit = {
-    applyConfig("kamon.metric.tick-interval = 10 seconds")
-  }
 }

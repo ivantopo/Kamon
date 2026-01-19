@@ -16,128 +16,124 @@
 package kamon.trace
 
 import kamon.Kamon
-import kamon.testkit.{InitAndStopKamonAfterAll, Reconfigure, SpanInspection, TestSpanReporter}
-import org.scalactic.TimesOnInt.convertIntToRepeater
-import org.scalatest.OptionValues
-import org.scalatest.concurrent.Eventually
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.SpanSugar
-import org.scalatest.wordspec.AnyWordSpec
+import kamon.testkit.{Reconfigure, SpanInspection}
+import kamon.testkit.munit.{Eventually, InitAndStopKamonAfterAll, TestSpanReporter}
+import munit.FunSuite
 
 import java.time.Instant
+import scala.concurrent.duration._
 
-class LocalTailSamplerSpec extends AnyWordSpec with Matchers with OptionValues with SpanInspection.Syntax
-    with Eventually
-    with SpanSugar with TestSpanReporter with Reconfigure with InitAndStopKamonAfterAll {
+class LocalTailSamplerSpec extends FunSuite with SpanInspection.Syntax
+    with Eventually with TestSpanReporter with Reconfigure with InitAndStopKamonAfterAll {
 
-  "the Kamon local tail sampler" should {
-    "keep traces that match the error count threshold" in {
-      applyConfig(
-        """
-          |kamon.trace {
-          |  sampler = never
-          |  span-reporting-delay = 1 second
-          |
-          |  local-tail-sampler {
-          |    enabled = yes
-          |    error-count-threshold = 3
-          |  }
-          |}
-          |""".stripMargin
-      )
+  test("keep traces that match the error count threshold") {
+    applyConfig(
+      """
+        |kamon.trace {
+        |  sampler = never
+        |  span-reporting-delay = 1 second
+        |
+        |  local-tail-sampler {
+        |    enabled = yes
+        |    error-count-threshold = 3
+        |  }
+        |}
+        |""".stripMargin
+    )
 
-      val parentSpan = Kamon.spanBuilder("parent-with-errors").start()
+    val parentSpan = Kamon.spanBuilder("parent-with-errors").start()
 
-      5 times {
-        Kamon.spanBuilder("child")
-          .asChildOf(parentSpan)
-          .start()
-          .fail("failing for tests")
-          .finish()
-      }
-
-      parentSpan.finish()
-      var spansFromParentTrace = 0
-
-      eventually(timeout(5 seconds)) {
-        val reportedSpan = testSpanReporter().nextSpan().value
-        reportedSpan.trace.id shouldBe parentSpan.trace.id
-        spansFromParentTrace += 1
-        spansFromParentTrace shouldBe 6 // The parent Span plus five child Spans
-      }
+    (1 to 5).foreach { _ =>
+      Kamon.spanBuilder("child")
+        .asChildOf(parentSpan)
+        .start()
+        .fail("failing for tests")
+        .finish()
     }
 
-    "keep traces that match the latency threshold" in {
-      applyConfig(
-        """
-          |kamon.trace {
-          |  sampler = never
-          |  span-reporting-delay = 1 second
-          |
-          |  local-tail-sampler {
-          |    enabled = yes
-          |    latency-threshold = 3 seconds
-          |  }
-          |}
-          |""".stripMargin
-      )
+    parentSpan.finish()
+    var spansFromParentTrace = 0
 
-      val startInstant = Instant.now()
-      val parentSpan = Kamon.spanBuilder("parent-with-high-latency").start(startInstant)
+    eventually(timeout = 5.seconds) {
+      val reportedSpan = testSpanReporter().nextSpan()
+      assert(reportedSpan.isDefined)
+      assertEquals(reportedSpan.get.trace.id, parentSpan.trace.id)
+      spansFromParentTrace += 1
+      assertEquals(spansFromParentTrace, 6) // The parent Span plus five child Spans
+    }
+  }
 
-      5 times {
-        Kamon.spanBuilder("child")
-          .asChildOf(parentSpan)
-          .start()
-          .finish()
-      }
+  test("keep traces that match the latency threshold") {
+    applyConfig(
+      """
+        |kamon.trace {
+        |  sampler = never
+        |  span-reporting-delay = 1 second
+        |
+        |  local-tail-sampler {
+        |    enabled = yes
+        |    latency-threshold = 3 seconds
+        |  }
+        |}
+        |""".stripMargin
+    )
 
-      parentSpan.finish(startInstant.plusSeconds(5))
-      var spansFromParentTrace = 0
+    val startInstant = Instant.now()
+    val parentSpan = Kamon.spanBuilder("parent-with-high-latency").start(startInstant)
 
-      eventually(timeout(5 seconds)) {
-        val reportedSpan = testSpanReporter().nextSpan().value
-        reportedSpan.trace.id shouldBe parentSpan.trace.id
-        spansFromParentTrace += 1
-        spansFromParentTrace shouldBe 6 // The parent Span plus five child Spans
-      }
+    (1 to 5).foreach { _ =>
+      Kamon.spanBuilder("child")
+        .asChildOf(parentSpan)
+        .start()
+        .finish()
     }
 
-    "not keep traces when tail sampling is disabled, even if they meet the criteria" in {
-      applyConfig(
-        """
-          |kamon.trace {
-          |  sampler = never
-          |  span-reporting-delay = 1 second
-          |
-          |  local-tail-sampler {
-          |    enabled = no
-          |    error-count-threshold= 1
-          |    latency-threshold = 3 seconds
-          |  }
-          |}
-          |""".stripMargin
-      )
+    parentSpan.finish(startInstant.plusSeconds(5))
+    var spansFromParentTrace = 0
 
-      val startInstant = Instant.now()
-      val parentSpan = Kamon.spanBuilder("parent-with-disabled-tail-sampler").start(startInstant)
+    eventually(timeout = 5.seconds) {
+      val reportedSpan = testSpanReporter().nextSpan()
+      assert(reportedSpan.isDefined)
+      assertEquals(reportedSpan.get.trace.id, parentSpan.trace.id)
+      spansFromParentTrace += 1
+      assertEquals(spansFromParentTrace, 6) // The parent Span plus five child Spans
+    }
+  }
 
-      5 times {
-        Kamon.spanBuilder("child")
-          .asChildOf(parentSpan)
-          .start()
-          .fail("failure that shouldn't cause the trace to be sampled")
-          .finish()
-      }
+  test("not keep traces when tail sampling is disabled, even if they meet the criteria") {
+    applyConfig(
+      """
+        |kamon.trace {
+        |  sampler = never
+        |  span-reporting-delay = 1 second
+        |
+        |  local-tail-sampler {
+        |    enabled = no
+        |    error-count-threshold= 1
+        |    latency-threshold = 3 seconds
+        |  }
+        |}
+        |""".stripMargin
+    )
 
-      parentSpan.finish(startInstant.plusSeconds(5))
+    val startInstant = Instant.now()
+    val parentSpan = Kamon.spanBuilder("parent-with-disabled-tail-sampler").start(startInstant)
 
-      4 times {
-        val allSpans = testSpanReporter().spans()
-        allSpans.find(_.operationName == parentSpan.operationName()) shouldBe empty
+    (1 to 5).foreach { _ =>
+      Kamon.spanBuilder("child")
+        .asChildOf(parentSpan)
+        .start()
+        .fail("failure that shouldn't cause the trace to be sampled")
+        .finish()
+    }
 
-        Thread.sleep(1000) // Should be enough time since all spans would be flushed after 1 second
-      }
+    parentSpan.finish(startInstant.plusSeconds(5))
+
+    (1 to 4).foreach { _ =>
+      val allSpans = testSpanReporter().spans()
+      assert(allSpans.find(_.operationName == parentSpan.operationName()).isEmpty)
+
+      Thread.sleep(1000) // Should be enough time since all spans would be flushed after 1 second
     }
   }
 }

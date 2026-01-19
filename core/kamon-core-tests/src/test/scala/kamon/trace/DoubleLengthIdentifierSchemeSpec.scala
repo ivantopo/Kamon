@@ -15,86 +15,76 @@
 
 package kamon.trace
 
-import org.scalactic.TimesOnInt._
-import org.scalatest.OptionValues
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class DoubleLengthIdentifierSchemeSpec extends AnyWordSpec with Matchers with OptionValues {
+class DoubleLengthIdentifierSchemeSpec extends FunSuite {
   import Identifier.Scheme.Double.{spanIdFactory, traceIdFactory}
 
-  "The double length identifier scheme" when {
-    "generating trace identifiers" should {
-      "generate random longs (16 byte) identifiers" in {
-        100 times {
-          val Identifier(string, bytes) = traceIdFactory.generate()
+  test("trace identifiers: generate random longs (16 byte) identifiers") {
+    (1 to 100).foreach { _ =>
+      val Identifier(string, bytes) = traceIdFactory.generate()
 
-          string.length should be(32)
-          bytes.length should be(16)
-        }
-      }
-
-      "decode the string representation back into a identifier" in {
-        100 times {
-          val identifier = traceIdFactory.generate()
-          val decodedIdentifier = traceIdFactory.from(identifier.string)
-
-          identifier.string should equal(decodedIdentifier.string)
-          identifier.bytes should equal(decodedIdentifier.bytes)
-        }
-      }
-
-      "decode the bytes representation back into a identifier" in {
-        100 times {
-          val identifier = traceIdFactory.generate()
-          val decodedIdentifier = traceIdFactory.from(identifier.bytes)
-
-          identifier.string should equal(decodedIdentifier.string)
-          identifier.bytes should equal(decodedIdentifier.bytes)
-        }
-      }
-
-      "return IdentityProvider.NoIdentifier if the provided input cannot be decoded into a Identifier" in {
-        traceIdFactory.from("zzzz") shouldBe (Identifier.Empty)
-        traceIdFactory.from(Array[Byte](1)) shouldBe (Identifier.Empty)
-      }
-    }
-
-    "generating span identifiers" should {
-      "generate random longs (8 byte) identifiers" in {
-        100 times {
-          val Identifier(string, bytes) = spanIdFactory.generate()
-
-          string.length should be(16)
-          bytes.length should be(8)
-        }
-      }
-
-      "decode the string representation back into a identifier" in {
-        100 times {
-          val identifier = spanIdFactory.generate()
-          val decodedIdentifier = spanIdFactory.from(identifier.string)
-
-          identifier.string should equal(decodedIdentifier.string)
-          identifier.bytes should equal(decodedIdentifier.bytes)
-        }
-      }
-
-      "decode the bytes representation back into a identifier" in {
-        100 times {
-          val identifier = spanIdFactory.generate()
-          val decodedIdentifier = spanIdFactory.from(identifier.bytes)
-
-          identifier.string should equal(decodedIdentifier.string)
-          identifier.bytes should equal(decodedIdentifier.bytes)
-        }
-      }
-
-      "return IdentityProvider.NoIdentifier if the provided input cannot be decoded into a Identifier" in {
-        spanIdFactory.from("zzzz") shouldBe (Identifier.Empty)
-        spanIdFactory.from(Array[Byte](1)) shouldBe (Identifier.Empty)
-      }
+      assertEquals(string.length, 32)
+      assertEquals(bytes.length, 16)
     }
   }
 
+  test("trace identifiers: decode the string representation back into a identifier") {
+    (1 to 100).foreach { _ =>
+      val identifier = traceIdFactory.generate()
+      val decodedIdentifier = traceIdFactory.from(identifier.string)
+
+      assertEquals(identifier.string, decodedIdentifier.string)
+      assertEquals(identifier.bytes.toSeq, decodedIdentifier.bytes.toSeq)
+    }
+  }
+
+  test("trace identifiers: decode the bytes representation back into a identifier") {
+    (1 to 100).foreach { _ =>
+      val identifier = traceIdFactory.generate()
+      val decodedIdentifier = traceIdFactory.from(identifier.bytes)
+
+      assertEquals(identifier.string, decodedIdentifier.string)
+      assertEquals(identifier.bytes.toSeq, decodedIdentifier.bytes.toSeq)
+    }
+  }
+
+  test("trace identifiers: return IdentityProvider.NoIdentifier if the provided input cannot be decoded into a Identifier") {
+    assertEquals(traceIdFactory.from("zzzz"), Identifier.Empty)
+    assertEquals(traceIdFactory.from(Array[Byte](1)), Identifier.Empty)
+  }
+
+  test("span identifiers: generate random longs (8 byte) identifiers") {
+    (1 to 100).foreach { _ =>
+      val Identifier(string, bytes) = spanIdFactory.generate()
+
+      assertEquals(string.length, 16)
+      assertEquals(bytes.length, 8)
+    }
+  }
+
+  test("span identifiers: decode the string representation back into a identifier") {
+    (1 to 100).foreach { _ =>
+      val identifier = spanIdFactory.generate()
+      val decodedIdentifier = spanIdFactory.from(identifier.string)
+
+      assertEquals(identifier.string, decodedIdentifier.string)
+      assertEquals(identifier.bytes.toSeq, decodedIdentifier.bytes.toSeq)
+    }
+  }
+
+  test("span identifiers: decode the bytes representation back into a identifier") {
+    (1 to 100).foreach { _ =>
+      val identifier = spanIdFactory.generate()
+      val decodedIdentifier = spanIdFactory.from(identifier.bytes)
+
+      assertEquals(identifier.string, decodedIdentifier.string)
+      assertEquals(identifier.bytes.toSeq, decodedIdentifier.bytes.toSeq)
+    }
+  }
+
+  test("span identifiers: return IdentityProvider.NoIdentifier if the provided input cannot be decoded into a Identifier") {
+    assertEquals(spanIdFactory.from("zzzz"), Identifier.Empty)
+    assertEquals(spanIdFactory.from(Array[Byte](1)), Identifier.Empty)
+  }
 }

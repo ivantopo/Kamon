@@ -19,94 +19,129 @@ import java.time.Instant
 
 import kamon.Kamon._
 import kamon.tag.TagSet
-import kamon.testkit.{InitAndStopKamonAfterAll, InstrumentInspection, MetricInspection, Reconfigure}
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import kamon.testkit.{InstrumentInspection, MetricInspection, Reconfigure}
+import kamon.testkit.munit.InitAndStopKamonAfterAll
+import munit.FunSuite
 
 import scala.util.control.NoStackTrace
 
-class SpanMetricsSpec extends AnyWordSpec with Matchers with InstrumentInspection.Syntax with MetricInspection.Syntax
+class SpanMetricsSpec extends FunSuite with InstrumentInspection.Syntax with MetricInspection.Syntax
     with Reconfigure with InitAndStopKamonAfterAll {
 
   sampleNever()
 
-  "the Span Metrics" should {
-    "track span.processing-time for successful execution on a Span" in {
-      val operation = "span-success"
-      val operationTag = "operation" -> operation
+  val errorTag = "error" -> true
+  val noErrorTag = "error" -> false
 
-      spanBuilder(operation)
-        .start()
-        .finish()
+  test("track span.processing-time for successful execution on a Span") {
+    val operation = "span-success"
+    val operationTag = "operation" -> operation
 
-      val histogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag)))
-      histogram.distribution().count shouldBe 1
+    spanBuilder(operation)
+      .start()
+      .finish()
 
-      val errorHistogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, errorTag)))
-      errorHistogram.distribution().count shouldBe 0
+    val histogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag)))
+    assertEquals(histogram.distribution().count, 1L)
 
-    }
+    val errorHistogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, errorTag)))
+    assertEquals(errorHistogram.distribution().count, 0L)
+  }
 
-    "not track span.processing-time when doNotTrackProcessingTime() is called on the SpanBuilder or the Span" in {
-      val operation = "span-with-disabled-metrics"
-      spanBuilder(operation)
-        .start()
-        .doNotTrackMetrics()
-        .finish()
+  test("not track span.processing-time when doNotTrackProcessingTime() is called on the SpanBuilder or the Span") {
+    val operation = "span-with-disabled-metrics"
+    spanBuilder(operation)
+      .start()
+      .doNotTrackMetrics()
+      .finish()
 
-      spanBuilder(operation)
-        .doNotTrackMetrics()
-        .start()
-        .finish()
+    spanBuilder(operation)
+      .doNotTrackMetrics()
+      .start()
+      .finish()
 
-      Span.Metrics.ProcessingTime.tagValues("operation") shouldNot contain(operation)
-    }
+    assert(!Span.Metrics.ProcessingTime.tagValues("operation").contains(operation))
+  }
 
-    "allow specifying custom Span metric tags" in {
-      val operation = "span-with-custom-metric-tags"
-      spanBuilder(operation)
-        .tagMetrics("custom-metric-tag-on-builder", "value")
-        .start()
-        .tagMetrics("custom-metric-tag-on-span", "value")
-        .finish()
+  test("allow specifying custom Span metric tags") {
+    val operation = "span-with-custom-metric-tags"
+    spanBuilder(operation)
+      .tagMetrics("custom-metric-tag-on-builder", "value")
+      .start()
+      .tagMetrics("custom-metric-tag-on-span", "value")
+      .finish()
 
-      Span.Metrics.ProcessingTime.tagValues("custom-metric-tag-on-builder") should contain("value")
-      Span.Metrics.ProcessingTime.tagValues("custom-metric-tag-on-span") should contain("value")
-    }
+    assert(Span.Metrics.ProcessingTime.tagValues("custom-metric-tag-on-builder").contains("value"))
+    assert(Span.Metrics.ProcessingTime.tagValues("custom-metric-tag-on-span").contains("value"))
+  }
 
-    "track span.processing-time if enabled by calling trackProcessingTime() on the Span" in {
-      val operation = "span-with-re-enabled-metrics"
-      spanBuilder(operation)
-        .start()
-        .doNotTrackMetrics()
-        .trackMetrics()
-        .finish()
+  test("track span.processing-time if enabled by calling trackProcessingTime() on the Span") {
+    val operation = "span-with-re-enabled-metrics"
+    spanBuilder(operation)
+      .start()
+      .doNotTrackMetrics()
+      .trackMetrics()
+      .finish()
 
-      Span.Metrics.ProcessingTime.tagValues("operation") should contain(operation)
-    }
+    assert(Span.Metrics.ProcessingTime.tagValues("operation").contains(operation))
+  }
 
-    "track span.processing-time for failed execution on a Span" in {
-      val operation = "span-failure"
-      val operationTag = "operation" -> operation
+  test("track span.processing-time for failed execution on a Span") {
+    val operation = "span-failure"
+    val operationTag = "operation" -> operation
 
-      spanBuilder(operation)
-        .start()
-        .fail("Terrible Error")
-        .finish()
+    spanBuilder(operation)
+      .start()
+      .fail("Terrible Error")
+      .finish()
 
-      spanBuilder(operation)
-        .start()
-        .fail("Terrible Error with Throwable", new Throwable with NoStackTrace)
-        .finish()
+    spanBuilder(operation)
+      .start()
+      .fail("Terrible Error with Throwable", new Throwable with NoStackTrace)
+      .finish()
 
-      val histogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag)))
-      histogram.distribution().count shouldBe 0
+    val histogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag)))
+    assertEquals(histogram.distribution().count, 0L)
 
-      val errorHistogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, errorTag)))
-      errorHistogram.distribution().count shouldBe 2
-    }
+    val errorHistogram = Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, errorTag)))
+    assertEquals(errorHistogram.distribution().count, 2L)
+  }
 
-    "add a parentOperation tag to the metrics if span metrics scoping is enabled" in {
+  test("add a parentOperation tag to the metrics if span metrics scoping is enabled") {
+    val parent = spanBuilder("parent").start()
+    val parentOperationTag = "parentOperation" -> "parent"
+
+    val operation = "span-with-parent"
+    val operationTag = "operation" -> operation
+
+    spanBuilder(operation)
+      .asChildOf(parent)
+      .start()
+      .finish()
+
+    spanBuilder(operation)
+      .asChildOf(parent)
+      .start()
+      .fail("Terrible Error")
+      .finish()
+
+    spanBuilder(operation)
+      .asChildOf(parent)
+      .start()
+      .fail("Terrible Error with Throwable", new Throwable with NoStackTrace)
+      .finish()
+
+    val histogram =
+      Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag, parentOperationTag)))
+    assertEquals(histogram.distribution().count, 1L)
+
+    val errorHistogram =
+      Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, errorTag, parentOperationTag)))
+    assertEquals(errorHistogram.distribution().count, 2L)
+  }
+
+  test("not add any parentOperation tag to the metrics if span metrics scoping is disabled") {
+    withoutSpanScopingEnabled {
       val parent = spanBuilder("parent").start()
       val parentOperationTag = "parentOperation" -> "parent"
 
@@ -132,97 +167,67 @@ class SpanMetricsSpec extends AnyWordSpec with Matchers with InstrumentInspectio
 
       val histogram =
         Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag, parentOperationTag)))
-      histogram.distribution().count shouldBe 1
+      assertEquals(histogram.distribution().count, 0L)
 
       val errorHistogram =
         Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, errorTag, parentOperationTag)))
-      errorHistogram.distribution().count shouldBe 2
-    }
-
-    "not add any parentOperation tag to the metrics if span metrics scoping is disabled" in withoutSpanScopingEnabled {
-      val parent = spanBuilder("parent").start()
-      val parentOperationTag = "parentOperation" -> "parent"
-
-      val operation = "span-with-parent"
-      val operationTag = "operation" -> operation
-
-      spanBuilder(operation)
-        .asChildOf(parent)
-        .start()
-        .finish()
-
-      spanBuilder(operation)
-        .asChildOf(parent)
-        .start()
-        .fail("Terrible Error")
-        .finish()
-
-      spanBuilder(operation)
-        .asChildOf(parent)
-        .start()
-        .fail("Terrible Error with Throwable", new Throwable with NoStackTrace)
-        .finish()
-
-      val histogram =
-        Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag, parentOperationTag)))
-      histogram.distribution().count shouldBe 0
-
-      val errorHistogram =
-        Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, errorTag, parentOperationTag)))
-      errorHistogram.distribution().count shouldBe 0
-    }
-
-    "track span.elapsed-time and span.wait-time for delayed spans" in {
-      val createTime = Instant.ofEpochSecond(0)
-      val operation = "delayed-span-success"
-      val operationTag = "operation" -> operation
-
-      spanBuilder(operation)
-        .delay(createTime)
-        .start(createTime.plusNanos(10))
-        .finish(createTime.plusNanos(30))
-
-      val waitTime = Span.Metrics.WaitTime.withTags(TagSet.from(Map(operationTag, noErrorTag))).distribution()
-      val elapsedTime = Span.Metrics.ElapsedTime.withTags(TagSet.from(Map(operationTag, noErrorTag))).distribution()
-      val processingTime =
-        Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag))).distribution()
-
-      waitTime.count shouldBe 1
-      waitTime.buckets.head.value shouldBe 10
-
-      elapsedTime.count shouldBe 1
-      elapsedTime.buckets.head.value shouldBe 30
-
-      processingTime.count shouldBe 1
-      processingTime.buckets.head.value shouldBe 20
-    }
-
-    "include the span kind tag on all Span metrics" in {
-      val operation = "span-with-kind"
-
-      spanBuilder(operation).start().finish()
-      serverSpanBuilder(operation, "test").delay().start().finish()
-      clientSpanBuilder(operation, "test").delay().start().finish()
-      producerSpanBuilder(operation, "test").delay().start().finish()
-      consumerSpanBuilder(operation, "test").delay().start().finish()
-      internalSpanBuilder(operation, "test").delay().start().finish()
-
-      val expectedSpanKinds = Seq(
-        "client",
-        "server",
-        "producer",
-        "consumer",
-        "internal"
-      )
-
-      Span.Metrics.ProcessingTime.tagValues("span.kind") should contain only (expectedSpanKinds: _*)
-      Span.Metrics.ElapsedTime.tagValues("span.kind") should contain only (expectedSpanKinds: _*)
-      Span.Metrics.WaitTime.tagValues("span.kind") should contain only (expectedSpanKinds: _*)
+      assertEquals(errorHistogram.distribution().count, 0L)
     }
   }
 
-  val errorTag = "error" -> true
-  val noErrorTag = "error" -> false
+  test("track span.elapsed-time and span.wait-time for delayed spans") {
+    val createTime = Instant.ofEpochSecond(0)
+    val operation = "delayed-span-success"
+    val operationTag = "operation" -> operation
+
+    spanBuilder(operation)
+      .delay(createTime)
+      .start(createTime.plusNanos(10))
+      .finish(createTime.plusNanos(30))
+
+    val waitTime = Span.Metrics.WaitTime.withTags(TagSet.from(Map(operationTag, noErrorTag))).distribution()
+    val elapsedTime = Span.Metrics.ElapsedTime.withTags(TagSet.from(Map(operationTag, noErrorTag))).distribution()
+    val processingTime =
+      Span.Metrics.ProcessingTime.withTags(TagSet.from(Map(operationTag, noErrorTag))).distribution()
+
+    assertEquals(waitTime.count, 1L)
+    assertEquals(waitTime.buckets.head.value, 10L)
+
+    assertEquals(elapsedTime.count, 1L)
+    assertEquals(elapsedTime.buckets.head.value, 30L)
+
+    assertEquals(processingTime.count, 1L)
+    assertEquals(processingTime.buckets.head.value, 20L)
+  }
+
+  test("include the span kind tag on all Span metrics") {
+    val operation = "span-with-kind"
+
+    spanBuilder(operation).start().finish()
+    serverSpanBuilder(operation, "test").delay().start().finish()
+    clientSpanBuilder(operation, "test").delay().start().finish()
+    producerSpanBuilder(operation, "test").delay().start().finish()
+    consumerSpanBuilder(operation, "test").delay().start().finish()
+    internalSpanBuilder(operation, "test").delay().start().finish()
+
+    val expectedSpanKinds = Seq(
+      "client",
+      "server",
+      "producer",
+      "consumer",
+      "internal"
+    )
+
+    val processingTimeSpanKinds = Span.Metrics.ProcessingTime.tagValues("span.kind")
+    val elapsedTimeSpanKinds = Span.Metrics.ElapsedTime.tagValues("span.kind")
+    val waitTimeSpanKinds = Span.Metrics.WaitTime.tagValues("span.kind")
+
+    expectedSpanKinds.foreach { kind =>
+      assert(processingTimeSpanKinds.contains(kind), s"ProcessingTime should contain span.kind=$kind")
+      assert(elapsedTimeSpanKinds.contains(kind), s"ElapsedTime should contain span.kind=$kind")
+      assert(waitTimeSpanKinds.contains(kind), s"WaitTime should contain span.kind=$kind")
+    }
+  }
 
   private def withoutSpanScopingEnabled[T](f: => T): T = {
     disableSpanMetricScoping()

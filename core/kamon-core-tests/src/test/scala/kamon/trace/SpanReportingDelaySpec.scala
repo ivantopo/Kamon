@@ -16,73 +16,66 @@
 package kamon.trace
 
 import kamon.Kamon
-import kamon.testkit.{InitAndStopKamonAfterAll, Reconfigure, SpanInspection, TestSpanReporter}
-import org.scalactic.TimesOnInt.convertIntToRepeater
-import org.scalatest.OptionValues
-import org.scalatest.concurrent.Eventually
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.SpanSugar
-import org.scalatest.wordspec.AnyWordSpec
+import kamon.testkit.{Reconfigure, SpanInspection}
+import kamon.testkit.munit.{Eventually, InitAndStopKamonAfterAll, TestSpanReporter}
+import munit.FunSuite
 
-class SpanReportingDelaySpec extends AnyWordSpec with Matchers with OptionValues with SpanInspection.Syntax
-    with Eventually
-    with SpanSugar with TestSpanReporter with Reconfigure with InitAndStopKamonAfterAll {
+import scala.concurrent.duration._
 
-  "the Kamon tracer" when {
-    "has span reporting delay disabled" should {
-      "keep spans with a positive sampling decision" in {
-        val span = Kamon.spanBuilder("positive-span-without-delay").start()
-        span.trace.keep()
-        span.finish()
+class SpanReportingDelaySpec extends FunSuite with SpanInspection.Syntax
+    with Eventually with TestSpanReporter with Reconfigure with InitAndStopKamonAfterAll {
 
-        eventually(timeout(5 seconds)) {
-          val reportedSpan = testSpanReporter().nextSpan().value
-          reportedSpan.operationName shouldBe span.operationName()
-        }
-      }
+  test("delay disabled: keep spans with a positive sampling decision") {
+    val span = Kamon.spanBuilder("positive-span-without-delay").start()
+    span.trace.keep()
+    span.finish()
 
-      "not report spans with a negative sampling decision" in {
-        val span = Kamon.spanBuilder("negative-span-without-delay").start()
-        span.trace.drop()
-        span.finish()
-        span.trace.keep() // Should not have any effect
-
-        5 times {
-          val allSpans = testSpanReporter().spans()
-          allSpans.find(_.operationName == span.operationName()) shouldBe empty
-
-          Thread.sleep(100) // Should be enough because Spans are reported every millisecond in tests
-        }
-      }
+    eventually(timeout = 5.seconds) {
+      val reportedSpan = testSpanReporter().nextSpan()
+      assert(reportedSpan.isDefined)
+      assertEquals(reportedSpan.get.operationName, span.operationName())
     }
+  }
 
-    "has span reporting delay enabled" should {
-      "keep spans with a positive sampling decision" in {
-        applyConfig("kamon.trace.span-reporting-delay = 2 seconds")
-        val span = Kamon.spanBuilder("overwrite-to-positive-with-delay").start()
-        span.trace.drop()
-        span.finish()
-        span.trace.keep() // Should force the Span to be reported, even though it was dropped before finising
+  test("delay disabled: not report spans with a negative sampling decision") {
+    val span = Kamon.spanBuilder("negative-span-without-delay").start()
+    span.trace.drop()
+    span.finish()
+    span.trace.keep() // Should not have any effect
 
-        eventually(timeout(5 seconds)) {
-          val reportedSpan = testSpanReporter().nextSpan().value
-          reportedSpan.operationName shouldBe span.operationName()
-        }
-      }
+    (1 to 5).foreach { _ =>
+      val allSpans = testSpanReporter().spans()
+      assert(allSpans.find(_.operationName == span.operationName()).isEmpty)
 
-      "not report spans with a negative sampling decision" in {
-        val span = Kamon.spanBuilder("negative-span-without-delay").start()
-        span.trace.keep()
-        span.finish()
-        span.trace.drop() // Should force the Span to be dropped, even though it was sampled before finishing
+      Thread.sleep(100) // Should be enough because Spans are reported every millisecond in tests
+    }
+  }
 
-        5 times {
-          val allSpans = testSpanReporter().spans()
-          allSpans.find(_.operationName == span.operationName()) shouldBe empty
+  test("delay enabled: keep spans with a positive sampling decision") {
+    applyConfig("kamon.trace.span-reporting-delay = 2 seconds")
+    val span = Kamon.spanBuilder("overwrite-to-positive-with-delay").start()
+    span.trace.drop()
+    span.finish()
+    span.trace.keep() // Should force the Span to be reported, even though it was dropped before finising
 
-          Thread.sleep(100) // Should be enough because Spans are reported every millisecond in tests
-        }
-      }
+    eventually(timeout = 5.seconds) {
+      val reportedSpan = testSpanReporter().nextSpan()
+      assert(reportedSpan.isDefined)
+      assertEquals(reportedSpan.get.operationName, span.operationName())
+    }
+  }
+
+  test("delay enabled: not report spans with a negative sampling decision") {
+    val span = Kamon.spanBuilder("negative-span-without-delay").start()
+    span.trace.keep()
+    span.finish()
+    span.trace.drop() // Should force the Span to be dropped, even though it was sampled before finishing
+
+    (1 to 5).foreach { _ =>
+      val allSpans = testSpanReporter().spans()
+      assert(allSpans.find(_.operationName == span.operationName()).isEmpty)
+
+      Thread.sleep(100) // Should be enough because Spans are reported every millisecond in tests
     }
   }
 }

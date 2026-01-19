@@ -20,121 +20,117 @@ import java.util.concurrent.atomic.AtomicLong
 import com.typesafe.config.Config
 import kamon.metric.PeriodSnapshot
 import kamon.testkit.Reconfigure
-import org.scalactic.TimesOnInt.convertIntToRepeater
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.concurrent.Eventually
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import kamon.testkit.munit.{Eventually, InitAndStopKamonAfterAll}
+import munit.FunSuite
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class ModuleRegistrySpec extends AnyWordSpec with Matchers with Reconfigure with Eventually with BeforeAndAfterAll {
-  "The ModuleRegistry" when {
-    "working with metrics reporters" should {
-      "report all metrics if no filters are applied" in {
-        Kamon.counter("test.hello").withoutTags().increment()
-        Kamon.counter("test.world").withoutTags().increment()
-        Kamon.counter("other.hello").withoutTags().increment()
-
-        val reporter = new SeenMetricsReporter()
-        val subscription = Kamon.registerModule("reporter-registry-spec", reporter)
-
-        eventually {
-          reporter.snapshotCount() should be >= 1
-          reporter.metrics() should contain allOf (
-            "test.hello",
-            "test.world",
-            "other.hello"
-          )
-        }
-
-        subscription.cancel()
-      }
-
-      "default to deny all metrics if a provided filter name doesn't exist" in {
-        Kamon.counter("test.hello").withoutTags().increment()
-        Kamon.counter("test.world").withoutTags().increment()
-        Kamon.counter("other.hello").withoutTags().increment()
-
-        val originalReporter = new SeenMetricsReporter()
-        val reporter =
-          MetricReporter.withTransformations(originalReporter, MetricReporter.filterMetrics("does-not-exist"))
-        val subscription = Kamon.registerModule("reporter-registry-spec", reporter)
-
-        eventually {
-          originalReporter.snapshotCount() should be >= 1
-          originalReporter.metrics() shouldBe empty
-        }
-
-        subscription.cancel()
-      }
-
-      "apply existent filters" in {
-        Kamon.counter("test.hello").withoutTags().increment()
-        Kamon.counter("test.world").withoutTags().increment()
-        Kamon.counter("other.hello").withoutTags().increment()
-
-        val originalReporter = new SeenMetricsReporter()
-        val reporter =
-          MetricReporter.withTransformations(originalReporter, MetricReporter.filterMetrics("test-metric-filter"))
-        val subscription = Kamon.registerModule("reporter-registry-spec", reporter)
-
-        eventually {
-          originalReporter.snapshotCount() should be >= 1
-          originalReporter.metrics() should contain allOf (
-            "test.hello",
-            "test.world"
-          )
-        }
-
-        subscription.cancel()
-      }
-    }
-
-    "starting and stopping modules" should {
-      "allow for all all modules to be stopped and started within the same process" in {
-        10 times {
-          val module = new DummyModule()
-          Kamon.registerModule("dummy", module)
-          Await.ready(Kamon.stopModules(), 5 seconds)
-        }
-      }
-    }
-  }
-
-  override protected def beforeAll(): Unit = {
-    Kamon.init()
-
+class ModuleRegistrySpec
+    extends FunSuite
+    with Reconfigure
+    with InitAndStopKamonAfterAll
+    with Eventually {
+  override def beforeAll(): Unit = {
+    super.beforeAll()
     applyConfig(
       """
         |kamon.metric.tick-interval = 10 millis
         |test-metric-filter {
-        |  includes = [ "test**" ]
+        |  includes = [ "filtered**" ]
         |}
         |
-    """.stripMargin
+        |""".stripMargin
     )
   }
 
-  override protected def afterAll(): Unit = {
+  override def afterAll(): Unit = {
     reset()
-    Kamon.stop()
+    super.afterAll()
   }
 
-  class SeenMetricsReporter extends MetricReporter {
+  test("report all metrics if no filters are applied") {
+    Kamon.counter("test.hello").withoutTags().increment()
+    Kamon.counter("test.world").withoutTags().increment()
+    Kamon.counter("other.hello").withoutTags().increment()
+
+    val reporter = new SeenMetricsReporter()
+    val subscription = Kamon.addReporter("reporter-registry-spec", reporter)
+
+    try {
+      eventually() {
+        val metrics = reporter.metrics()
+        assert(reporter.snapshotCount() >= 1)
+        assert(metrics.contains("test.hello"))
+        assert(metrics.contains("test.world"))
+        assert(metrics.contains("other.hello"))
+      }
+    } finally {
+      subscription.cancel()
+    }
+  }
+
+  test("default to deny all metrics if a provided filter name doesn't exist") {
+    Kamon.counter("test.hello").withoutTags().increment()
+    Kamon.counter("test.world").withoutTags().increment()
+    Kamon.counter("other.hello").withoutTags().increment()
+
+    val originalReporter = new SeenMetricsReporter()
+    val reporter =
+      MetricReporter.withTransformations(originalReporter, MetricReporter.filterMetrics("does-not-exist"))
+    val subscription = Kamon.addReporter("reporter-registry-spec", reporter)
+
+    try {
+      eventually() {
+        assert(originalReporter.snapshotCount() >= 1)
+        assertEquals(originalReporter.metrics(), Seq.empty)
+      }
+    } finally {
+      subscription.cancel()
+    }
+  }
+
+  test("apply existent filters") {
+    Kamon.counter("filtered.hello").withoutTags().increment()
+    Kamon.counter("filtered.world").withoutTags().increment()
+    Kamon.counter("other.hello").withoutTags().increment()
+
+    val originalReporter = new SeenMetricsReporter()
+    val reporter =
+      MetricReporter.withTransformations(originalReporter, MetricReporter.filterMetrics("test-metric-filter"))
+    val subscription = Kamon.addReporter("reporter-registry-spec", reporter)
+
+    try {
+      eventually() {
+        val metrics = originalReporter.metrics().toSet
+        assert(originalReporter.snapshotCount() >= 1)
+        assertEquals(metrics, Set("filtered.hello", "filtered.world"))
+      }
+    } finally {
+      subscription.cancel()
+    }
+  }
+
+  test("allow modules to stop and start repeatedly") {
+    (1 to 10).foreach { _ =>
+      val module = new DummyModule()
+      Kamon.registerModule("dummy", module)
+      Await.ready(Kamon.stopModules(), 5.seconds)
+    }
+  }
+
+  private class SeenMetricsReporter extends MetricReporter {
     @volatile private var count = 0
     @volatile private var seenMetrics = Seq.empty[String]
 
     override def reportPeriodSnapshot(snapshot: PeriodSnapshot): Unit = {
-      import snapshot._
       count += 1
       seenMetrics =
-        counters.map(_.name) ++
-        histograms.map(_.name) ++
-        gauges.map(_.name) ++
-        rangeSamplers.map(_.name) ++
-        timers.map(_.name)
+        snapshot.counters.map(_.name) ++
+        snapshot.histograms.map(_.name) ++
+        snapshot.gauges.map(_.name) ++
+        snapshot.rangeSamplers.map(_.name) ++
+        snapshot.timers.map(_.name)
     }
 
     def metrics(): Seq[String] =
@@ -147,9 +143,9 @@ class ModuleRegistrySpec extends AnyWordSpec with Matchers with Reconfigure with
     override def reconfigure(config: Config): Unit = {}
   }
 
-  val dummyModuleCount = new AtomicLong(0L)
+  private val dummyModuleCount = new AtomicLong(0L)
 
-  class DummyModule extends Module {
+  private class DummyModule extends Module {
     dummyModuleCount.incrementAndGet()
 
     override def reconfigure(newConfig: Config): Unit = {}

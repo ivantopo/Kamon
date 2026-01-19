@@ -17,10 +17,9 @@ package kamon.status
 
 import com.typesafe.config.ConfigFactory
 import kamon.tag.TagSet
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
+import munit.FunSuite
 
-class EnvironmentSpec extends AnyWordSpec with Matchers {
+class EnvironmentSpec extends FunSuite {
   private val baseConfig = ConfigFactory.parseString(
     """
       |kamon.environment {
@@ -28,63 +27,60 @@ class EnvironmentSpec extends AnyWordSpec with Matchers {
       |  host = auto
       |  instance = auto
       |}
-    """.stripMargin
+      |""".stripMargin
   ).withFallback(ConfigFactory.defaultReference())
 
-  "the Kamon environment" should {
-    "assign a host and instance name when they are set to 'auto'" in {
-      val env = Environment.from(baseConfig)
+  test("assign a host and instance name when they are set to 'auto'") {
+    val env = Environment.from(baseConfig)
 
-      env.host shouldNot be("auto")
-      env.instance shouldNot be("auto")
-      env.instance shouldBe s"environment-spec@${env.host}"
-      env.tags shouldBe empty
-    }
-
-    "use the configured host and instance, if provided" in {
-      val customConfig = ConfigFactory.parseString(
-        """
-          |kamon.environment {
-          |  host = spec-host
-          |  instance = spec-instance
-          |}
-        """.stripMargin
-      )
-
-      val env = Environment.from(customConfig.withFallback(baseConfig))
-
-      env.host should be("spec-host")
-      env.instance should be("spec-instance")
-      env.tags shouldBe empty
-    }
-
-    "read all environment tags, if provided" in {
-      val customConfig = ConfigFactory.parseString(
-        """
-          |kamon.environment.tags {
-          |  custom1 = "test1"
-          |  env = staging
-          |}
-        """.stripMargin
-      )
-
-      val env = Environment.from(customConfig.withFallback(baseConfig))
-
-      env.tags.toMap should contain allOf (
-        ("custom1" -> "test1"),
-        ("env" -> "staging")
-      )
-    }
-
-    "always return the same incarnation name" in {
-      val envOne = Environment.from(baseConfig)
-      val envTwo = Environment.from(baseConfig)
-
-      envOne.incarnation shouldBe envTwo.incarnation
-    }
+    assertNotEquals(env.host, "auto")
+    assertNotEquals(env.instance, "auto")
+    assertEquals(env.instance, s"environment-spec@${env.host}")
+    assert(env.tags.isEmpty())
   }
 
-  implicit def toMap(tags: TagSet): Map[String, String] = {
+  test("use the configured host and instance, if provided") {
+    val customConfig = ConfigFactory.parseString(
+      """
+        |kamon.environment {
+        |  host = spec-host
+        |  instance = spec-instance
+        |}
+        |""".stripMargin
+    )
+
+    val env = Environment.from(customConfig.withFallback(baseConfig))
+
+    assertEquals(env.host, "spec-host")
+    assertEquals(env.instance, "spec-instance")
+    assert(env.tags.isEmpty())
+  }
+
+  test("read all environment tags, if provided") {
+    val customConfig = ConfigFactory.parseString(
+      """
+        |kamon.environment.tags {
+        |  custom1 = "test1"
+        |  env = staging
+        |}
+        |""".stripMargin
+    )
+
+    val env = Environment.from(customConfig.withFallback(baseConfig))
+    val tags = tagsToMap(env.tags)
+
+    assertEquals(tags.get("custom1"), Some("test1"))
+    assertEquals(tags.get("env"), Some("staging"))
+  }
+
+  test("always return the same incarnation name") {
+    val envOne = Environment.from(baseConfig)
+    val envTwo = Environment.from(baseConfig)
+
+    assertEquals(envOne.incarnation, envTwo.incarnation)
+  }
+
+  private def tagsToMap(tags: TagSet): Map[String, String] = {
     val map = Map.newBuilder[String, String]
     tags.iterator(_.toString).foreach(pair => map += pair.key -> pair.value)
     map.result()
