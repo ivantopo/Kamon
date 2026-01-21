@@ -102,13 +102,11 @@ inConfig(`Test-Play-30`)(Defaults.testSettings ++ instrumentationSettings ++ bas
   unmanagedResourceDirectories ++= (TestCommon / unmanagedResourceDirectories).value
 ))
 
-Test / test := Def.taskDyn {
-  Def.task {
-    (`Test-Play-28` / test).value
-    (`Test-Play-29` / test).value
-    (`Test-Play-30` / test).value
-  }
-}.value
+Test / test := Def.sequential(
+  `Test-Play-28` / test,
+  `Test-Play-29` / test,
+  `Test-Play-30` / test
+).value
 
 def singleTestPerJvm(tests: Seq[TestDefinition], jvmSettings: Seq[String]): Seq[Group] =
   tests map { test =>

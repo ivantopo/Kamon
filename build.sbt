@@ -493,7 +493,6 @@ lazy val `kamon-akka-http` = (project in file("instrumentation/kamon-akka-http")
   .disablePlugins(AssemblyPlugin)
   .settings(instrumentationSettings)
   .settings(Seq(
-    resolvers += Resolver.bintrayRepo("hseeberger", "maven"),
     javaAgents += "org.mortbay.jetty.alpn" % "jetty-alpn-agent" % "2.0.10" % "test",
     libraryDependencies ++= Seq(
       kanelaAgent % "provided",
@@ -1059,7 +1058,7 @@ lazy val `kamon-runtime-attacher` = (project in file("bundle/kamon-runtime-attac
 lazy val `kamon-bundle-dependencies-all` = (project in file("bundle/kamon-bundle-dependencies-all"))
   .disablePlugins(AssemblyPlugin)
   .settings(noPublishing: _*)
-  .settings(ideSkipProject: _*)
+  .settings(ideSkipProjectSettings: _*)
   .dependsOn(
     `kamon-runtime-attacher`,
     `kamon-status-page`,
@@ -1100,7 +1099,7 @@ lazy val `kamon-bundle-dependencies-all` = (project in file("bundle/kamon-bundle
 lazy val `kamon-bundle-dependencies-2-13` = (project in file("bundle/kamon-bundle-dependencies-2-12-and-up"))
   .disablePlugins(AssemblyPlugin)
   .settings(noPublishing: _*)
-  .settings(ideSkipProject: _*)
+  .settings(ideSkipProjectSettings: _*)
   .settings(
     crossScalaVersions := Seq(
       `scala_2.13_version`
@@ -1127,7 +1126,7 @@ lazy val `kamon-bundle-dependencies-2-13` = (project in file("bundle/kamon-bundl
 lazy val `kamon-bundle-dependencies-3` = (project in file("bundle/kamon-bundle-dependencies-3"))
   .disablePlugins(AssemblyPlugin)
   .settings(noPublishing: _*)
-  .settings(ideSkipProject: _*)
+  .settings(ideSkipProjectSettings: _*)
   .dependsOn(
     `kamon-runtime-attacher`,
     `kamon-status-page`,
@@ -1163,7 +1162,7 @@ lazy val `kamon-bundle-dependencies-3` = (project in file("bundle/kamon-bundle-d
 lazy val `kamon-bundle` = (project in file("bundle/kamon-bundle"))
   .enablePlugins(AssemblyPlugin)
   .settings(commonBundleSettings)
-  .settings(ideSkipProject: _*)
+  .settings(ideSkipProjectSettings: _*)
   .settings(
     crossScalaVersions := Seq(
       `scala_2.13_version`
@@ -1177,7 +1176,7 @@ lazy val `kamon-bundle` = (project in file("bundle/kamon-bundle"))
 lazy val `kamon-bundle-3` = (project in file("bundle/kamon-bundle-3"))
   .enablePlugins(AssemblyPlugin)
   .settings(commonBundleSettings)
-  .settings(ideSkipProject: _*)
+  .settings(ideSkipProjectSettings: _*)
   .settings(
     scalaVersion := scala_3_version,
     crossScalaVersions := Seq(scala_3_version)
@@ -1189,7 +1188,7 @@ lazy val `kamon-bundle-3` = (project in file("bundle/kamon-bundle-3"))
 
 lazy val `bill-of-materials` = (project in file("bill-of-materials"))
   .enablePlugins(BillOfMaterialsPlugin)
-  .settings(ideSkipProject: _*)
+  .settings(ideSkipProjectSettings: _*)
   .settings(
     name := "kamon-bom",
     crossVersion := CrossVersion.disabled,

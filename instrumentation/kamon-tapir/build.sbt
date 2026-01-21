@@ -7,7 +7,7 @@ inConfig(TestLegacy)(Defaults.testSettings)
 
 Compile / products := (Compile / products).value ++ (Legacy / products).value
 
-Test / test := {
-  (Test / test).value
-  (TestLegacy / test).value
-}
+Test / test := Def.sequential(
+  Test / test,
+  TestLegacy / test
+).value

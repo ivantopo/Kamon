@@ -24,7 +24,7 @@ configs(Cassandra3xTest, Cassandra4xTest)
 inConfig(Cassandra3xTest)(Defaults.testSettings)
 inConfig(Cassandra4xTest)(Defaults.testSettings)
 
-Test / test := {
-  (Cassandra3xTest / test).value
-  (Cassandra4xTest / test).value
-}
+Test / test := Def.sequential(
+  Cassandra3xTest / test,
+  Cassandra4xTest / test
+).value

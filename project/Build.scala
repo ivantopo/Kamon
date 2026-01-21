@@ -60,8 +60,10 @@ object BaseProject extends AutoPlugin {
       javaAgents := Seq("io.kamon" % "kanela-agent" % kanelaAgentVersion.value % "runtime;test")
     )
 
-    val ideSkipProject = Seq(
-      SettingKey[Boolean]("ideSkipProject") := true
+    val ideSkipProject: SettingKey[Boolean] = SettingKey[Boolean]("ideSkipProject")
+
+    val ideSkipProjectSettings = Seq(
+      ideSkipProject := true
     )
 
     val `scala_2.13_version` = "2.13.13"
@@ -133,6 +135,7 @@ object BaseProject extends AutoPlugin {
     Global / concurrentRestrictions += Tags.limit(Tags.Test, 1),
     licenses += (("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0"))),
     resolvers += Resolver.mavenLocal,
+    Global / excludeLintKeys ++= Set(autoImport.ideSkipProject, javaAgents, semanticdbTargetRoot),
     Keys.commands += Command.command("testUntilFailed") { state: State =>
       "test" :: "testUntilFailed" :: state
     }
