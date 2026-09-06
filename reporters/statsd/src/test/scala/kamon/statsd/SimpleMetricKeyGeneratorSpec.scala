@@ -19,10 +19,16 @@ package kamon.statsd
 import com.typesafe.config.{Config, ConfigFactory}
 import kamon.Kamon
 import kamon.tag.TagSet
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class SimpleMetricKeyGeneratorSpec extends AnyWordSpec with Matchers {
+class SimpleMetricKeyGeneratorSpec extends AnyWordSpec with Matchers with BeforeAndAfterAll {
+
+  override def afterAll(): Unit = {
+    Kamon.reconfigure(ConfigFactory.load())
+    super.afterAll()
+  }
 
   val defaultConfiguration: Config = ConfigFactory.parseString(
     """

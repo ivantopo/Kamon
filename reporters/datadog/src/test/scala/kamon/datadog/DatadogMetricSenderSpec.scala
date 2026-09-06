@@ -22,14 +22,20 @@ import kamon.datadog.DatadogAgentReporter.PacketBuffer
 import kamon.metric._
 import kamon.tag.TagSet
 import kamon.testkit.Reconfigure
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
 class DatadogMetricSenderSpec extends AnyWordSpec
-    with Matchers with Reconfigure {
+    with Matchers with BeforeAndAfterAll with Reconfigure {
   reconfigure =>
+
+  override def afterAll(): Unit = {
+    Kamon.reconfigure(ConfigFactory.load())
+    super.afterAll()
+  }
 
   class TestBuffer extends PacketBuffer {
 
