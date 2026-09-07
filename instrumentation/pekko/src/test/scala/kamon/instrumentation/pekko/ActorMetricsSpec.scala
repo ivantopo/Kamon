@@ -143,6 +143,10 @@ class ActorMetricsSpec extends TestKit(ActorSystem("ActorMetricsSpec")) with Any
       if (resetState) {
         val tags = actorTags(s"ActorMetricsSpec/user/$name")
 
+        eventually(timeout(2 seconds)) {
+          ActorTimeInMailbox.withTags(tags).distribution().count should be >= 1L
+        }
+
         ActorTimeInMailbox.withTags(tags).distribution(resetState = true)
         ActorProcessingTime.withTags(tags).distribution(resetState = true)
         ActorMailboxSize.withTags(tags).distribution(resetState = true)

@@ -157,6 +157,6 @@ trait Tracing { self: Configuration with Utilities with ContextStorage =>
   }
 
   /** The Tracer instance is only exposed to other Kamon components that need it like the Module Registry and Status */
-  protected def tracer(): Tracer =
+  protected[kamon] def tracer(): Tracer =
     _tracer
 }

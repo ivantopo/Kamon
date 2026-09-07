@@ -49,7 +49,7 @@ jobs:
         run: ./mill --no-daemon 'core.__.test'
 
       - name: Test reporters
-        run: ./mill --no-daemon 'reporters.__.test'
+        run: ./mill --no-daemon -j 1 'reporters.__.test'
 
       - name: Test instrumentation
-        run: ./mill --no-daemon 'instrumentation.__.test'
+        run: ./mill --no-daemon -j 1 'instrumentation.__.test'

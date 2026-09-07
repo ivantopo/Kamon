@@ -70,7 +70,7 @@ class ClientInstrumentationSpec
       }
 
       eventually(timeout(3 seconds)) {
-        val span = testSpanReporter().nextSpan().value
+        val span = testSpanReporter().spans().find(_.parentId == okSpan.id).value
 
         span.operationName shouldBe "/tracing/ok"
         span.kind shouldBe Span.Kind.Client
@@ -80,8 +80,6 @@ class ClientInstrumentationSpec
         span.metricTags.get(
           plain("parentOperation")
         ) shouldBe "ok-operation-span"
-
-        okSpan.id == span.parentId
       }
     }
 
@@ -104,14 +102,12 @@ class ClientInstrumentationSpec
       }
 
       eventually(timeout(3 seconds)) {
-        val span = testSpanReporter().nextSpan().value
+        val span = testSpanReporter().spans().find(_.parentId == okSpan.id).value
         span.operationName shouldBe "/tracing/ok"
         span.kind shouldBe Span.Kind.Client
         span.metricTags.get(plain("component")) shouldBe "http4s.client"
         span.metricTags.get(plain("http.method")) shouldBe "GET"
         span.hasError shouldBe true
-
-        okSpan.id == span.parentId
       }
     }
 
@@ -127,7 +123,7 @@ class ClientInstrumentationSpec
       }
 
       eventually(timeout(3 seconds)) {
-        val span = testSpanReporter().nextSpan().value
+        val span = testSpanReporter().spans().find(_.parentId == notFoundSpan.id).value
         span.operationName shouldBe "/tracing/not-found"
         span.kind shouldBe Span.Kind.Client
         span.metricTags.get(plain("component")) shouldBe "http4s.client"
@@ -136,8 +132,6 @@ class ClientInstrumentationSpec
         span.metricTags.get(
           plain("parentOperation")
         ) shouldBe "not-found-operation-span"
-
-        notFoundSpan.id == span.parentId
       }
     }
 
@@ -153,7 +147,7 @@ class ClientInstrumentationSpec
       }
 
       eventually(timeout(3 seconds)) {
-        val span = testSpanReporter().nextSpan().value
+        val span = testSpanReporter().spans().find(_.parentId == errorSpan.id).value
 
         span.operationName shouldBe "/tracing/error"
         span.kind shouldBe Span.Kind.Client
@@ -164,8 +158,6 @@ class ClientInstrumentationSpec
         span.metricTags.get(
           plain("parentOperation")
         ) shouldBe "error-operation-span"
-
-        errorSpan.id == span.parentId
       }
     }
 

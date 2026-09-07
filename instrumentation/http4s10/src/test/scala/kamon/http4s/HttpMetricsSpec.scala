@@ -44,9 +44,16 @@ class HttpMetricsSpec
     with OptionValues
     with InitAndStopKamonAfterAll {
 
+  val port: Int = {
+    val socket = new java.net.ServerSocket(0)
+    val p = socket.getLocalPort
+    socket.close()
+    p
+  }
+
   val srv =
     BlazeServerBuilder[IO](global.compute)
-      .bindLocal(43567)
+      .bindLocal(port)
       .withHttpApp(
         KamonSupport(
           HttpRoutes.of[IO] {
@@ -56,7 +63,7 @@ class HttpMetricsSpec
               InternalServerError("This page will generate an error!")
           },
           "/127.0.0.1",
-          43567
+          port
         ).orNotFound
       )
       .resource
@@ -66,7 +73,7 @@ class HttpMetricsSpec
 
   val metrics =
     Resource.eval(
-      IO(HttpServerMetrics.of("http4s.server", "/127.0.0.1", 43567))
+      IO(HttpServerMetrics.of("http4s.server", "/127.0.0.1", port))
     )
 
   def withServerAndClient[A](
