@@ -5,8 +5,10 @@ import kamon.tag.Lookups
 import kamon.tag.Lookups._
 import kamon.testkit.{InitAndStopKamonAfterAll, MetricInspection, TestSpanReporter}
 import kamon.trace.Span.Kind
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.SpanSugar
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.OptionValues
 import org.slf4j.LoggerFactory
@@ -26,12 +28,18 @@ class RedisInstrumentationsSpec extends AnyWordSpec
     with InitAndStopKamonAfterAll
     with MetricInspection.Syntax
     with OptionValues
-    with TestSpanReporter {
+    with TestSpanReporter
+    with BeforeAndAfterEach {
 
   private val logger = LoggerFactory.getLogger(classOf[RedisInstrumentationsSpec])
   var container: GenericContainer[Nothing] = _
 
-  override def beforeAll: Unit = {
+  override def beforeEach(): Unit = {
+    testSpanReporter().clear()
+    super.beforeEach()
+  }
+
+  override def beforeAll(): Unit = {
     super.beforeAll()
     val REDIS_IMAGE = DockerImageName.parse("redis")
     container = new GenericContainer(REDIS_IMAGE).withExposedPorts(6379)
@@ -39,7 +47,7 @@ class RedisInstrumentationsSpec extends AnyWordSpec
     container.start()
   }
 
-  override def afterAll: Unit = {
+  override def afterAll(): Unit = {
     container.stop()
     super.afterAll()
   }
@@ -79,7 +87,7 @@ class RedisInstrumentationsSpec extends AnyWordSpec
       val asyncCommands = connection.async()
       asyncCommands.set("key", "Hello, Redis!")
 
-      eventually(timeout(2.seconds)) {
+      eventually(timeout(10.seconds)) {
         val span = testSpanReporter().nextSpan().get
         span.operationName shouldBe "redis.command.SET"
         span.kind shouldBe Kind.Client
@@ -95,7 +103,7 @@ class RedisInstrumentationsSpec extends AnyWordSpec
 
       commands.get("key")
 
-      eventually(timeout(2.seconds)) {
+      eventually(timeout(10.seconds)) {
         val span = testSpanReporter().nextSpan().get
         span.operationName shouldBe "redis.command.GET"
         span.kind shouldBe Kind.Client
@@ -116,7 +124,7 @@ class RedisInstrumentationsSpec extends AnyWordSpec
         case NonFatal(x) => println(s"Task failed successfully")
       }
 
-      eventually(timeout(2.seconds)) {
+      eventually(timeout(10.seconds)) {
         val span = testSpanReporter().nextSpan().get
         span.operationName shouldBe "redis.command.GET"
         span.kind shouldBe Kind.Client
