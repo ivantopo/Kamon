@@ -32,6 +32,7 @@ import org.scalatest.time.SpanSugar
 import org.scalatest.OptionValues
 
 import java.net.ConnectException
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -42,7 +43,13 @@ class ClientInstrumentationSpec
     with SpanSugar
     with OptionValues
     with TestSpanReporter
+    with BeforeAndAfterEach
     with InitAndStopKamonAfterAll {
+
+  override protected def beforeEach(): Unit = {
+    testSpanReporter().clear()
+    super.beforeEach()
+  }
 
   val service = HttpRoutes.of[IO] {
     case GET -> Root / "tracing" / "ok"        => Ok("ok")

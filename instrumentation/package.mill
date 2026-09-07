@@ -705,7 +705,7 @@ trait redis extends KamonModule {
   }
 }
 
-object mongo extends Cross[mongo](AllScalaVersions)
+object mongo extends Cross[mongo](Scala2Version)
 trait mongo extends KamonModule {
 
   override def artifactName = "kamon-mongo"
