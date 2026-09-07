@@ -1082,6 +1082,7 @@ trait spring extends KamonModule {
       Deps.h2,
       Deps.jaxbApi,
       Deps.springBootStarterDataJpa,
+      Deps.springBootStarterWeb,
       Deps.springBootStarterWebflux,
       Deps.javaxServletApi
     )
