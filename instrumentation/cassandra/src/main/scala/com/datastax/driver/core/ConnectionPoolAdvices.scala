@@ -29,7 +29,8 @@ import scala.annotation.static
 class PoolConstructorAdvice
 object PoolConstructorAdvice {
 
-  @Advice.OnMethodExit
+  // Scala 3 emits invokedynamic for the sampling lambda; old driver classes cannot inline it.
+  @Advice.OnMethodExit(inline = false)
   @static def onConstructed(
     @Advice.This poolWithMetrics: HostConnectionPool with HasPoolMetrics,
     @Advice.FieldValue("host") host: Host,
