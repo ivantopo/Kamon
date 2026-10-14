@@ -9,24 +9,24 @@ import scala.collection.concurrent.TrieMap
 
 object AkkaRemoteMetrics {
 
-  val InboundMessageSize = Kamon.histogram (
+  val InboundMessageSize = Kamon.histogram(
     name = "akka.remote.messages.inbound.size",
     description = "Tracks the distribution of inbound message sizes",
     unit = information.bytes
   )
 
-  val OutboundMessageSize = Kamon.histogram (
+  val OutboundMessageSize = Kamon.histogram(
     name = "akka.remote.messages.outbound.size",
     description = "Tracks the distribution of outbound message sizes",
     unit = information.bytes
   )
 
-  val SerializationTime = Kamon.timer (
+  val SerializationTime = Kamon.timer(
     name = "akka.remote.serialization-time",
     description = "Tracks the time taken to serialize outgoing messages"
   )
 
-  val DeserializationTime = Kamon.timer (
+  val DeserializationTime = Kamon.timer(
     name = "akka.remote.deserialization-time",
     description = "Tracks the time taken to deserialize incoming messages"
   )

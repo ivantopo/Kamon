@@ -92,7 +92,7 @@ class OpenSearchInstrumentationTest
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    
+
     container.addExposedPort(9200)
     container.addEnv("discovery.type", "single-node")
     container.addEnv("plugins.security.disabled", "true")
@@ -100,7 +100,7 @@ class OpenSearchInstrumentationTest
     container.start()
 
     val hostAddress = s"${container.getHost}:${container.getMappedPort(9200)}"
-    
+
     client = RestClient
       .builder(HttpHost.create(hostAddress))
       .build()

@@ -15,7 +15,6 @@
 
 package kamon.instrumentation.play
 
-
 import kamon.Kamon
 import kamon.context.Context
 import kamon.tag.Lookups.{plain, plainLong}
@@ -42,9 +41,10 @@ import play.api.test.Helpers._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-
-class WSInstrumentationSpec extends PlaySpecShim with GuiceOneServerPerSuite with ScalaFutures with Eventually with SpanSugar
-  with InitAndStopKamonAfterAll with MetricInspection.Syntax with Reconfigure with OptionValues with TestSpanReporter {
+class WSInstrumentationSpec extends PlaySpecShim with GuiceOneServerPerSuite with ScalaFutures with Eventually
+    with SpanSugar
+    with InitAndStopKamonAfterAll with MetricInspection.Syntax with Reconfigure with OptionValues
+    with TestSpanReporter {
 
   System.setProperty("config.file", "./instrumentation/play/src/test/resources/conf/application.conf")
 
@@ -56,28 +56,34 @@ class WSInstrumentationSpec extends PlaySpecShim with GuiceOneServerPerSuite wit
     val action = app.injector.instanceOf(classOf[DefaultActionBuilder])
 
     {
-      case ("GET", "/ok")                 => handler(action { Ok })
-      case ("GET", "/trace-id")           => handler(action { Ok(Kamon.currentSpan().trace.id.string) })
-      case ("GET", "/example-tag")        => handler(action { Ok(Kamon.currentContext().getTag(plain("example"))) })
-      case ("GET", "/error")              => handler(action { InternalServerError })
-      case ("GET", "/inside-controller")  => handler(insideController(s"http://localhost:$port/async")(app))
+      case ("GET", "/ok")                => handler(action { Ok })
+      case ("GET", "/trace-id")          => handler(action { Ok(Kamon.currentSpan().trace.id.string) })
+      case ("GET", "/example-tag")       => handler(action { Ok(Kamon.currentContext().getTag(plain("example"))) })
+      case ("GET", "/error")             => handler(action { InternalServerError })
+      case ("GET", "/inside-controller") => handler(insideController(s"http://localhost:$port/async")(app))
     }
   }
 
   // Adds the HandlerDef attribute to the request which simulates what would happen when a generated router handles
   // the request.
   def handler[T](action: Action[T]): Handler = {
-    Stage.modifyRequest(req => {
-      req.addAttr(Router.Attrs.HandlerDef, HandlerDef(
-        classLoader = getClass.getClassLoader,
-        routerPackage = "kamon",
-        controller = "kamon.TestController",
-        method = "testMethod",
-        parameterTypes = Seq.empty,
-        verb = req.method,
-        path = req.path
-      ))
-    }, action)
+    Stage.modifyRequest(
+      req => {
+        req.addAttr(
+          Router.Attrs.HandlerDef,
+          HandlerDef(
+            classLoader = getClass.getClassLoader,
+            routerPackage = "kamon",
+            controller = "kamon.TestController",
+            method = "testMethod",
+            parameterTypes = Seq.empty,
+            verb = req.method,
+            path = req.path
+          )
+        )
+      },
+      action
+    )
   }
 
   "the WS instrumentation" should {
@@ -151,7 +157,7 @@ class WSInstrumentationSpec extends PlaySpecShim with GuiceOneServerPerSuite wit
     }
   }
 
-  def insideController(url: String)(app:Application): Action[AnyContent] = {
+  def insideController(url: String)(app: Application): Action[AnyContent] = {
     val action = app.injector.instanceOf(classOf[DefaultActionBuilder])
     val wsClient = app.injector.instanceOf[WSClient]
 
@@ -169,5 +175,3 @@ class WSInstrumentationSpec extends PlaySpecShim with GuiceOneServerPerSuite wit
     }
   }
 }
-
-

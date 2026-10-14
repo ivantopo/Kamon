@@ -64,8 +64,8 @@ class CassandraClientTracingInstrumentationSpec
         "SELECT * FROM users where name = 'kamon' ALLOW FILTERING"
       )
       eventually(timeout(10 seconds)) {
-        val spans         = testSpanReporter().spans()
-        val clientSpan    = spans.find(_.operationName == QueryOperations.QueryOperationName)
+        val spans = testSpanReporter().spans()
+        val clientSpan = spans.find(_.operationName == QueryOperations.QueryOperationName)
         val executionSpan = spans.find(_.operationName == QueryOperations.ExecutionOperationName)
 
         clientSpan should not be empty
@@ -88,8 +88,8 @@ class CassandraClientTracingInstrumentationSpec
       session.execute(query).iterator().asScala.foreach(_ => ())
 
       eventually(timeout(20 seconds)) {
-        val spans          = testSpanReporter().spans()
-        val clientSpan     = spans.find(span => span.operationName == QueryOperations.QueryOperationName)
+        val spans = testSpanReporter().spans()
+        val clientSpan = spans.find(span => span.operationName == QueryOperations.QueryOperationName)
         val executionSpans = spans.filter(span => span.operationName == QueryOperations.ExecutionOperationName)
 
         clientSpan should not be empty
@@ -134,7 +134,9 @@ class CassandraClientTracingInstrumentationSpec
     cassandra.start()
     session = cassandra.getCluster.newSession()
 
-    session.execute(statement(s"create keyspace $keyspace with replication = {'class':'SimpleStrategy', 'replication_factor':3}"))
+    session.execute(
+      statement(s"create keyspace $keyspace with replication = {'class':'SimpleStrategy', 'replication_factor':3}")
+    )
     session.execute(statement(s"USE $keyspace"))
     session.execute(statement("create table users (id uuid primary key, name text )"))
 

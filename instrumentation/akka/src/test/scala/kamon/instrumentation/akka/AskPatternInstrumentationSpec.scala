@@ -16,7 +16,6 @@
 
 package kamon.instrumentation.akka
 
-
 import akka.actor._
 import akka.pattern.ask
 import akka.testkit.{EventFilter, ImplicitSender, TestKit}
@@ -88,7 +87,8 @@ class AskPatternInstrumentationSpec extends TestKit(ActorSystem("AskPatternInstr
   }
 
   def setAskPatternTimeoutWarningMode(mode: String): Unit = {
-    val newConfiguration = ConfigFactory.parseString(s"kamon.akka.ask-pattern-timeout-warning=$mode").withFallback(Kamon.config())
+    val newConfiguration =
+      ConfigFactory.parseString(s"kamon.akka.ask-pattern-timeout-warning=$mode").withFallback(Kamon.config())
     Kamon.reconfigure(newConfiguration)
   }
 }

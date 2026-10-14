@@ -46,13 +46,13 @@ object TestApp extends App {
   val latencyAwarePolicy = LatencyAwarePolicy
     .builder(dcRoundRobinPolicy)
     .withExclusionThreshold(1.5)
-    .withMininumMeasurements(50) //default
-    .withRetryPeriod(1, TimeUnit.MINUTES) //default 10ms
-    .withScale(100, TimeUnit.MILLISECONDS) //default
+    .withMininumMeasurements(50) // default
+    .withRetryPeriod(1, TimeUnit.MINUTES) // default 10ms
+    .withScale(100, TimeUnit.MILLISECONDS) // default
     .withUpdateRate(100, TimeUnit.MILLISECONDS)
     .build()
 
-  //Node level timeout, 1 sec, allow for one retry by default policy
+  // Node level timeout, 1 sec, allow for one retry by default policy
   val socketOptions = new SocketOptions()
     .setReadTimeoutMillis(2200)
 

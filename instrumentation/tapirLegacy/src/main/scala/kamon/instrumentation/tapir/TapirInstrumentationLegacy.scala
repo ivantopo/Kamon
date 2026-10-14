@@ -23,7 +23,6 @@ import kanela.agent.libs.net.bytebuddy.implementation.bind.annotation.{Argument,
 import sttp.tapir.server.ServerEndpoint
 import java.util.concurrent.Callable
 
-
 class TapirInstrumentationLegacy extends InstrumentationBuilder {
   onTypes("sttp.tapir.server.akkahttp.EndpointToAkkaServer", "sttp.tapir.server.akkahttp.AkkaHttpServerInterpreter")
     .when(classIsPresent("sttp.tapir.server.ServerEndpoint").withExpectedMethodNames("renderPathTemplate"))
@@ -44,7 +43,7 @@ object TapirToRouteInterceptorLegacy {
 
           val operationName = endpoint.info.name match {
             case Some(endpointName) if useEndpointNameAsOperationName => endpointName
-            case _ => endpoint.renderPathTemplate()
+            case _                                                    => endpoint.renderPathTemplate()
           }
 
           Kamon.currentSpan()

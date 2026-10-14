@@ -16,7 +16,6 @@
 
 package kamon.instrumentation.akka
 
-
 import akka.actor.{ActorSystem, ExtendedActorSystem, Props}
 import akka.dispatch.Envelope
 import akka.testkit.{ImplicitSender, TestKit}
@@ -47,7 +46,7 @@ class EnvelopeSpec extends TestKit(ActorSystem("EnvelopeSpec")) with AnyWordSpec
           val oos = new ObjectOutputStream(bos)
           oos.writeObject(env)
           oos.close()
-          akka.serialization.JavaSerializer.currentSystem.withValue(system.asInstanceOf[ExtendedActorSystem])  {
+          akka.serialization.JavaSerializer.currentSystem.withValue(system.asInstanceOf[ExtendedActorSystem]) {
             val ois = new ObjectInputStream(new ByteArrayInputStream(bos.toByteArray()))
             val obj = ois.readObject()
             ois.close()

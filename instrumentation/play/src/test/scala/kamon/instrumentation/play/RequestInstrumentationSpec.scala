@@ -86,11 +86,11 @@ abstract class RequestHandlerInstrumentationSpec extends PlaySpecShim with Guice
       case ("GET", "/not-found") => handler(action { NotFound })
       case ("GET", "/server")    => handler(action { req => Ok(serverImplementationName(req)) })
       case ("GET", "/error")     => handler(action(_ => sys.error("This page generates an error!")))
-      case ("GET", "/rename-outside")    => {
+      case ("GET", "/rename-outside") => {
         Kamon.currentSpan().name("renamed-outside-action")
         handler(action { req => Ok(serverImplementationName(req)) })
       }
-      case ("GET", "/rename-inside")    => {
+      case ("GET", "/rename-inside") => {
         handler(action { req =>
           Kamon.currentSpan().name("renamed-inside-action")
           Ok(serverImplementationName(req))

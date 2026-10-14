@@ -9,7 +9,7 @@ trait VersionFiltering {
     * Runs the code block if Akka is known to be present.
     */
   def onAkka(block: => Unit): Unit = {
-    if(akkaVersion().nonEmpty)
+    if (akkaVersion().nonEmpty)
       block
   }
 
@@ -17,7 +17,7 @@ trait VersionFiltering {
     * Runs the code block if a version of Akka starting with the provided version is known to be present.
     */
   def onAkka(version: String*)(block: => Unit): Unit = {
-    if(akkaVersion().exists(av => version.exists(v => av.startsWith(v))))
+    if (akkaVersion().exists(av => version.exists(v => av.startsWith(v))))
       block
   }
 
@@ -31,7 +31,7 @@ trait VersionFiltering {
     val lastSeparator = version.map(_.lastIndexOf('.'))
     val versions: Option[(String, String)] = version.map(_.splitAt(lastSeparator.getOrElse(0)))
 
-    if(versions.exists(x => x._1.startsWith(major) && minor >= x._2.drop(1).toInt)) {
+    if (versions.exists(x => x._1.startsWith(major) && minor >= x._2.drop(1).toInt)) {
       block
     }
   }
@@ -45,7 +45,7 @@ trait VersionFiltering {
     val lastSeparator = version.map(_.lastIndexOf('.'))
     val versions: Option[(String, String)] = version.map(_.splitAt(lastSeparator.getOrElse(0)))
 
-    if(versions.exists(x => x._1.startsWith(major) && minor <= x._2.drop(1).toInt)) {
+    if (versions.exists(x => x._1.startsWith(major) && minor <= x._2.drop(1).toInt)) {
       block
     }
   }

@@ -28,15 +28,15 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration._
 
-
-class ActorSystemMetricsSpec extends TestKit(ActorSystem("ActorSystemMetricsSpec")) with AnyWordSpecLike with MetricInspection.Syntax
+class ActorSystemMetricsSpec extends TestKit(ActorSystem("ActorSystemMetricsSpec")) with AnyWordSpecLike
+    with MetricInspection.Syntax
     with InstrumentInspection.Syntax with Matchers with InitAndStopKamonAfterAll with ImplicitSender with Eventually {
 
   // Akka 2.6 creates two more actors by default for the streams materializers supervisor.
   val (baseActorCount, totalActorCount) = Version.current match {
     case v if v.startsWith("2.6") => (8L, 29)
     case v if v.startsWith("2.7") => (8L, 29)
-    case _ => (6L, 27)
+    case _                        => (6L, 27)
   }
 
   val systemMetrics = AkkaMetrics.forSystem(system.name)

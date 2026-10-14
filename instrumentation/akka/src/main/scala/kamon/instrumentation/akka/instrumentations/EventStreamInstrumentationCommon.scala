@@ -28,7 +28,7 @@ class ConstructorAdvice
 object ConstructorAdvice {
 
   @OnMethodExit(suppress = classOf[Throwable])
-  @static def exit(@Advice.This eventStream: HasSystem, @Argument(0) system:ActorSystem): Unit = {
+  @static def exit(@Advice.This eventStream: HasSystem, @Argument(0) system: ActorSystem): Unit = {
     eventStream.setSystem(system)
   }
 }
@@ -41,9 +41,9 @@ object PublishMethodAdvice {
     try {
       def stream = any.asInstanceOf[HasSystem]
       event match {
-        case _: DeadLetter => AkkaMetrics.forSystem(stream.system.name).deadLetters.increment()
+        case _: DeadLetter       => AkkaMetrics.forSystem(stream.system.name).deadLetters.increment()
         case _: UnhandledMessage => AkkaMetrics.forSystem(stream.system.name).unhandledMessages.increment()
-        case _ => ()
+        case _                   => ()
       }
     } catch {
       case _: ClassCastException => ()

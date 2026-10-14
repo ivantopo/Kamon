@@ -15,7 +15,6 @@
 
 package kamon.instrumentation.instrumentation
 
-
 import com.datastax.driver.core.QueryOperations
 import com.datastax.oss.driver.api.core.cql.{SimpleStatement, SimpleStatementBuilder}
 import com.datastax.oss.driver.api.core.servererrors.SyntaxError
@@ -104,7 +103,6 @@ class CassandraClientTracingInstrumentationSpec
     }
   }
 
-
   var session: CqlSession = _
   val cassandra = new CassandraContainer("cassandra:3.11.10")
 
@@ -126,7 +124,9 @@ class CassandraClientTracingInstrumentationSpec
       .withLocalDatacenter("datacenter1")
       .build()
 
-    session.execute(statement(s"create keyspace $keyspace with replication = {'class':'SimpleStrategy', 'replication_factor':3}"))
+    session.execute(
+      statement(s"create keyspace $keyspace with replication = {'class':'SimpleStrategy', 'replication_factor':3}")
+    )
     session.execute(statement(s"USE $keyspace"))
     session.execute(statement("create table users (id uuid primary key, name text )"))
 

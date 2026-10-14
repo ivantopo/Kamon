@@ -4,7 +4,11 @@ import java.io.ByteArrayOutputStream
 
 import akka.KamonOptionVal.OptionVal
 import akka.actor.{ActorRef, Address}
-import akka.remote.ContextAwareWireFormats_Akka26.{AckAndContextAwareEnvelopeContainer, ContextAwareRemoteEnvelope, RemoteContext}
+import akka.remote.ContextAwareWireFormats_Akka26.{
+  AckAndContextAwareEnvelopeContainer,
+  ContextAwareRemoteEnvelope,
+  RemoteContext
+}
 import akka.remote.WireFormats.{AcknowledgementInfo, ActorRefData, AddressData, SerializedMessage}
 import akka.remote.{Ack, SeqNo}
 import akka.util.ByteString
@@ -19,12 +23,14 @@ import kanela.agent.libs.net.bytebuddy.implementation.bind.annotation.{Argument,
 class AkkaPduProtobufCodecConstructMessageMethodInterceptor {
 
   @RuntimeType
-  def aroundConstructMessage(@Argument(0) localAddress: Address,
-                             @Argument(1) recipient: ActorRef,
-                             @Argument(2) serializedMessage: SerializedMessage,
-                             @Argument(3) senderOption: OptionVal[ActorRef],
-                             @Argument(4) seqOption: Option[SeqNo],
-                             @Argument(5) ackOption: Option[Ack]): AnyRef = {
+  def aroundConstructMessage(
+    @Argument(0) localAddress: Address,
+    @Argument(1) recipient: ActorRef,
+    @Argument(2) serializedMessage: SerializedMessage,
+    @Argument(3) senderOption: OptionVal[ActorRef],
+    @Argument(4) seqOption: Option[SeqNo],
+    @Argument(5) ackOption: Option[Ack]
+  ): AnyRef = {
 
     val ackAndEnvelopeBuilder = AckAndContextAwareEnvelopeContainer.newBuilder
     val envelopeBuilder = ContextAwareRemoteEnvelope.newBuilder
@@ -49,7 +55,7 @@ class AkkaPduProtobufCodecConstructMessageMethodInterceptor {
     val messageSize = envelopeBuilder.getMessage.getMessage.size()
     AkkaRemoteMetrics.serializationInstruments(localAddress.system).outboundMessageSize.record(messageSize)
 
-    ByteString.ByteString1C(ackAndEnvelopeBuilder.build.toByteArray) //Reuse Byte Array (naughty!)
+    ByteString.ByteString1C(ackAndEnvelopeBuilder.build.toByteArray) // Reuse Byte Array (naughty!)
   }
 
   // Copied from akka.remote.transport.AkkaPduProtobufCodec because of private access.
@@ -64,7 +70,8 @@ class AkkaPduProtobufCodecConstructMessageMethodInterceptor {
   private def serializeActorRef(defaultAddress: Address, ref: ActorRef): ActorRefData = {
     ActorRefData.newBuilder.setPath(
       if (ref.path.address.host.isDefined) ref.path.toSerializationFormat
-      else ref.path.toSerializationFormatWithAddress(defaultAddress)).build()
+      else ref.path.toSerializationFormatWithAddress(defaultAddress)
+    ).build()
   }
 
   // Copied from akka.remote.transport.AkkaPduProtobufCodec because of private access.

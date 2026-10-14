@@ -1,8 +1,15 @@
 package kamon.instrumentation.akka.instrumentations.akka_26.remote
 
 import akka.actor.ActorSystem
-import akka.remote.kamon.instrumentation.akka.instrumentations.akka_26.remote.{CaptureContextOnInboundEnvelope, DeserializeForArteryAdvice, SerializeForArteryAdvice}
-import akka.kamon.instrumentation.akka.instrumentations.akka_26.remote.internal.{AkkaPduProtobufCodecConstructMessageMethodInterceptor, AkkaPduProtobufCodecDecodeMessage}
+import akka.remote.kamon.instrumentation.akka.instrumentations.akka_26.remote.{
+  CaptureContextOnInboundEnvelope,
+  DeserializeForArteryAdvice,
+  SerializeForArteryAdvice
+}
+import akka.kamon.instrumentation.akka.instrumentations.akka_26.remote.internal.{
+  AkkaPduProtobufCodecConstructMessageMethodInterceptor,
+  AkkaPduProtobufCodecDecodeMessage
+}
 import akka.remote.artery.CaptureCurrentInboundEnvelope
 import kamon.Kamon
 import kamon.context.{Context, Storage}
@@ -15,7 +22,6 @@ import kanela.agent.api.instrumentation.InstrumentationBuilder
 import kanela.agent.libs.net.bytebuddy.asm.Advice
 
 import scala.annotation.static
-
 
 class RemotingInstrumentation extends InstrumentationBuilder with VersionFiltering {
 
@@ -142,12 +148,12 @@ object MeasureSerializationTime {
 
   @Advice.OnMethodEnter
   @static def enter(): Long = {
-    if(AkkaRemoteInstrumentation.settings().trackSerializationMetrics) System.nanoTime() else 0L
+    if (AkkaRemoteInstrumentation.settings().trackSerializationMetrics) System.nanoTime() else 0L
   }
 
   @Advice.OnMethodExit
   @static def exit(@Advice.Argument(0) system: AnyRef, @Advice.Enter startNanoTime: Long): Unit = {
-    if(startNanoTime != 0L) {
+    if (startNanoTime != 0L) {
       system.asInstanceOf[HasSerializationInstruments]
         .serializationInstruments
         .serializationTime
@@ -161,13 +167,17 @@ object MeasureDeserializationTime {
 
   @Advice.OnMethodEnter
   @static def enter(): Long = {
-    if(AkkaRemoteInstrumentation.settings().trackSerializationMetrics) System.nanoTime() else 0L
+    if (AkkaRemoteInstrumentation.settings().trackSerializationMetrics) System.nanoTime() else 0L
   }
 
   @Advice.OnMethodExit
-  @static def exit(@Advice.Argument(0) system: AnyRef, @Advice.Enter startNanoTime: Long, @Advice.Return msg: Any): Unit = {
+  @static def exit(
+    @Advice.Argument(0) system: AnyRef,
+    @Advice.Enter startNanoTime: Long,
+    @Advice.Return msg: Any
+  ): Unit = {
 
-    if(AkkaPrivateAccess.isSystemMessage(msg)) {
+    if (AkkaPrivateAccess.isSystemMessage(msg)) {
       msg match {
         case hc: HasContext if hc.context == null =>
           hc.setContext(Kamon.currentContext())
@@ -175,7 +185,7 @@ object MeasureDeserializationTime {
       }
     }
 
-    if(startNanoTime != 0L) {
+    if (startNanoTime != 0L) {
       system.asInstanceOf[HasSerializationInstruments]
         .serializationInstruments
         .deserializationTime

@@ -33,7 +33,7 @@ object MessageClassAdvice {
     try {
       e.message match {
         case message: WrappedMessage => ActorCellInfo.simpleClassName(message.message.getClass)
-        case _ => ActorCellInfo.simpleClassName(e.message.getClass)
+        case _                       => ActorCellInfo.simpleClassName(e.message.getClass)
       }
     } catch {
       // NoClassDefFound is thrown in early versions of akka 2.6

@@ -17,7 +17,16 @@
 package kamon.instrumentation.akka.instrumentations.akka_26
 
 import java.util.concurrent.{AbstractExecutorService, Callable, ExecutorService, ThreadFactory, TimeUnit}
-import akka.dispatch.{DefaultExecutorServiceConfigurator, DispatcherPrerequisites, Dispatchers, ExecutorServiceFactory, ExecutorServiceFactoryProvider, ForkJoinExecutorConfigurator, PinnedDispatcherConfigurator, ThreadPoolExecutorConfigurator}
+import akka.dispatch.{
+  DefaultExecutorServiceConfigurator,
+  DispatcherPrerequisites,
+  Dispatchers,
+  ExecutorServiceFactory,
+  ExecutorServiceFactoryProvider,
+  ForkJoinExecutorConfigurator,
+  PinnedDispatcherConfigurator,
+  ThreadPoolExecutorConfigurator
+}
 import kamon.instrumentation.akka.instrumentations.VersionFiltering
 import kamon.Kamon
 import kamon.instrumentation.akka.AkkaInstrumentation
@@ -30,7 +39,7 @@ import kanela.agent.libs.net.bytebuddy.implementation.bind.annotation.{Argument,
 
 import scala.annotation.static
 
-class DispatcherInstrumentation extends InstrumentationBuilder with VersionFiltering  {
+class DispatcherInstrumentation extends InstrumentationBuilder with VersionFiltering {
 
   onAkka("2.6", "2.7") {
 
@@ -49,10 +58,11 @@ class DispatcherInstrumentation extends InstrumentationBuilder with VersionFilte
       * constructors of these two classes.
       */
     onTypes(
-        "akka.dispatch.ThreadPoolExecutorConfigurator",
-        "akka.dispatch.ForkJoinExecutorConfigurator",
-        "akka.dispatch.PinnedDispatcherConfigurator",
-        "akka.dispatch.DefaultExecutorServiceConfigurator")
+      "akka.dispatch.ThreadPoolExecutorConfigurator",
+      "akka.dispatch.ForkJoinExecutorConfigurator",
+      "akka.dispatch.PinnedDispatcherConfigurator",
+      "akka.dispatch.DefaultExecutorServiceConfigurator"
+    )
       .mixin(classOf[HasDispatcherPrerequisites.Mixin])
       .advise(isConstructor, CaptureDispatcherPrerequisitesOnExecutorConfigurator)
 
@@ -61,10 +71,11 @@ class DispatcherInstrumentation extends InstrumentationBuilder with VersionFilte
       * executors instrumented by Kamon.
       */
     onTypes(
-        "akka.dispatch.ThreadPoolConfig",
-        "akka.dispatch.ForkJoinExecutorConfigurator",
-        "akka.dispatch.PinnedDispatcherConfigurator",
-        "akka.dispatch.DefaultExecutorServiceConfigurator")
+      "akka.dispatch.ThreadPoolConfig",
+      "akka.dispatch.ForkJoinExecutorConfigurator",
+      "akka.dispatch.PinnedDispatcherConfigurator",
+      "akka.dispatch.DefaultExecutorServiceConfigurator"
+    )
       .mixin(classOf[HasDispatcherName.Mixin])
       .advise(method("createExecutorServiceFactory"), CopyDispatcherInfoToExecutorServiceFactory)
 
@@ -84,10 +95,14 @@ object CaptureDispatcherPrerequisitesOnExecutorConfigurator {
   @Advice.OnMethodExit(suppress = classOf[Throwable])
   @static def exit(@Advice.This configurator: Any, @Advice.Argument(1) prerequisites: DispatcherPrerequisites): Unit = {
     configurator match {
-      case fjec: ForkJoinExecutorConfigurator => fjec.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
-      case tpec: ThreadPoolExecutorConfigurator => tpec.threadPoolConfig.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
-      case pdc: PinnedDispatcherConfigurator => pdc.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
-      case desc: DefaultExecutorServiceConfigurator => desc.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
+      case fjec: ForkJoinExecutorConfigurator =>
+        fjec.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
+      case tpec: ThreadPoolExecutorConfigurator =>
+        tpec.threadPoolConfig.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
+      case pdc: PinnedDispatcherConfigurator =>
+        pdc.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
+      case desc: DefaultExecutorServiceConfigurator =>
+        desc.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(prerequisites)
       case _ => // just ignore any other case.
     }
   }
@@ -97,7 +112,11 @@ class CopyDispatcherInfoToExecutorServiceFactory
 object CopyDispatcherInfoToExecutorServiceFactory {
 
   @Advice.OnMethodExit
-  @static def exit(@Advice.This poolConfig: HasDispatcherPrerequisites, @Advice.Argument(0) dispatcherName: String, @Advice.Return factory: Any): Unit = {
+  @static def exit(
+    @Advice.This poolConfig: HasDispatcherPrerequisites,
+    @Advice.Argument(0) dispatcherName: String,
+    @Advice.Return factory: Any
+  ): Unit = {
     val factoryWithMixins = factory.asInstanceOf[HasDispatcherName with HasDispatcherPrerequisites]
     factoryWithMixins.setDispatcherPrerequisites(poolConfig.dispatcherPrerequisites)
     factoryWithMixins.setDispatcherName(dispatcherName)
@@ -107,21 +126,36 @@ object CopyDispatcherInfoToExecutorServiceFactory {
 class InstrumentNewExecutorServiceOnAkka26
 object InstrumentNewExecutorServiceOnAkka26 {
 
-  @static def around(@This factory: HasDispatcherPrerequisites with HasDispatcherName, @SuperCall callable: Callable[ExecutorService]): ExecutorService = {
+  @static def around(
+    @This factory: HasDispatcherPrerequisites with HasDispatcherName,
+    @SuperCall callable: Callable[ExecutorService]
+  ): ExecutorService = {
     val executor = callable.call()
     val dispatcherName = factory.dispatcherName
 
-    if(Kamon.filter(AkkaInstrumentation.TrackDispatcherFilterName).accept(dispatcherName)) {
+    if (Kamon.filter(AkkaInstrumentation.TrackDispatcherFilterName).accept(dispatcherName)) {
       val actorSystemName = factory.dispatcherPrerequisites.settings.name
       val scheduledActionName = actorSystemName + "/" + dispatcherName
       val systemTags = TagSet.of("akka.system", actorSystemName)
       val defaultEcOption = factory.dispatcherPrerequisites.defaultExecutionContext
 
-      if(dispatcherName == Dispatchers.DefaultDispatcherId && defaultEcOption.isDefined) {
-        ExecutorInstrumentation.instrumentExecutionContext(defaultEcOption.get, dispatcherName, systemTags, scheduledActionName, ExecutorInstrumentation.DefaultSettings)
+      if (dispatcherName == Dispatchers.DefaultDispatcherId && defaultEcOption.isDefined) {
+        ExecutorInstrumentation.instrumentExecutionContext(
+          defaultEcOption.get,
+          dispatcherName,
+          systemTags,
+          scheduledActionName,
+          ExecutorInstrumentation.DefaultSettings
+        )
           .underlyingExecutor.getOrElse(executor)
       } else {
-        ExecutorInstrumentation.instrument(executor, dispatcherName, systemTags, scheduledActionName, ExecutorInstrumentation.DefaultSettings)
+        ExecutorInstrumentation.instrument(
+          executor,
+          dispatcherName,
+          systemTags,
+          scheduledActionName,
+          ExecutorInstrumentation.DefaultSettings
+        )
       }
     } else executor
   }
@@ -132,7 +166,9 @@ object ThreadPoolConfigCopyAdvice {
 
   @Advice.OnMethodExit
   @static def exit(@Advice.This original: Any, @Advice.Return copy: Any): Unit = {
-    copy.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(original.asInstanceOf[HasDispatcherPrerequisites].dispatcherPrerequisites)
+    copy.asInstanceOf[HasDispatcherPrerequisites].setDispatcherPrerequisites(
+      original.asInstanceOf[HasDispatcherPrerequisites].dispatcherPrerequisites
+    )
     copy.asInstanceOf[HasDispatcherName].setDispatcherName(original.asInstanceOf[HasDispatcherName].dispatcherName)
   }
 }

@@ -57,7 +57,7 @@ class CassandraClientMetricsSpec
       // We are reading the only possible host from the metric tags to ensure that we lookup the
       // right instruments, regardless of whether localhost resolved to 127.0.0.1 or 0:0:0:0:0:0:0:1
       val hostAddress = NodeConnectionPoolMetrics.InFlight.tagValues("cassandra.node").head
-      val node        = Node(hostAddress, "datacenter1", "rack1")
+      val node = Node(hostAddress, "datacenter1", "rack1")
       val poolMetrics = new NodeConnectionPoolInstruments(node)
 
       eventually(timeout(20 seconds)) {
@@ -75,11 +75,11 @@ class CassandraClientMetricsSpec
         .withTags(
           TagSet.from(
             Map(
-              "component"            -> "cassandra.driver",
+              "component" -> "cassandra.driver",
               "cassandra.query.kind" -> "select",
-              "span.kind"            -> "client",
-              "operation"            -> "cassandra.query",
-              "error"                -> false
+              "span.kind" -> "client",
+              "operation" -> "cassandra.query",
+              "error" -> false
             )
           )
         )
@@ -89,10 +89,10 @@ class CassandraClientMetricsSpec
         .withTags(
           TagSet.from(
             Map(
-              "span.kind"         -> "client",
-              "operation"         -> "cassandra.query.execution",
-              "error"             -> false,
-              "component"         -> "cassandra.driver"
+              "span.kind" -> "client",
+              "operation" -> "cassandra.query.execution",
+              "error" -> false,
+              "component" -> "cassandra.driver"
             )
           )
         )
@@ -123,7 +123,6 @@ class CassandraClientMetricsSpec
   var session: Session = _
   val cassandra = new CassandraContainer("cassandra:3.11.10")
 
-
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
@@ -133,7 +132,9 @@ class CassandraClientMetricsSpec
     session = cassandra.getCluster().newSession()
     val keyspace = s"keyspaceMetricSpec"
 
-    session.execute(statement(s"create keyspace $keyspace with replication = {'class':'SimpleStrategy', 'replication_factor':3}"))
+    session.execute(
+      statement(s"create keyspace $keyspace with replication = {'class':'SimpleStrategy', 'replication_factor':3}")
+    )
     session.execute(statement(s"USE $keyspace"))
     session.execute(statement("create table users (id uuid primary key, name text )"))
     session.execute(statement("insert into users (id, name) values (uuid(), 'kamon')"))
