@@ -16,7 +16,7 @@
 
 package kamon.instrumentation.tapir
 
-import kamon.testkit.TestSpanReporter
+import kamon.testkit.{InitAndStopKamonAfterAll, TestSpanReporter}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -25,50 +25,49 @@ import sttp.client3.{HttpURLConnectionBackend, Identity, SttpBackend, UriContext
 
 import scala.concurrent.duration.DurationInt
 
-class TapirSpec extends AnyWordSpec with Matchers
+class TapirAkkaHttpSpec extends AnyWordSpec with Matchers
+    with InitAndStopKamonAfterAll
     with TestSpanReporter
     with Eventually
-    with BeforeAndAfterAll
     with OptionValues {
 
   var backend: SttpBackend[Identity, Any] = _
+  var listenPort: Int = 0
 
   override def beforeAll() = {
+    super.beforeAll()
     backend = HttpURLConnectionBackend()
-    TapirAkkaHttpServer.start
+    listenPort = TapirAkkaHttpServer.start()
   }
 
   override def afterAll() = {
-    TapirAkkaHttpServer.stop
+    TapirAkkaHttpServer.stop()
     backend.close()
+    super.afterAll()
   }
 
   "the Tapir Akka HTTP instrumentation" should {
     "replace params in path when naming span" in {
       basicRequest
         .response(asStringAlways)
-        .get(uri"http://localhost:8080/hello/frodo").send(backend)
+        .get(uri"http://localhost:$listenPort/hello/frodo").send(backend)
         .body
 
       eventually(timeout(2.seconds)) {
-        val span = testSpanReporter().nextSpan()
-        span.map { s =>
-          s.operationName shouldBe "/hello/{param1}"
-        }
+        val span = testSpanReporter().nextSpan().value
+        span.operationName shouldBe "/hello/{param1}"
       }
     }
 
     "replace params with mixed type params when naming span" in {
       basicRequest
         .response(asStringAlways)
-        .get(uri"http://localhost:8080/nested/path/with/3/mixed/true/types").send(backend)
+        .get(uri"http://localhost:$listenPort/nested/path/with/3/mixed/true/types").send(backend)
         .body
 
       eventually(timeout(2.seconds)) {
-        val span = testSpanReporter().nextSpan()
-        span.map { s =>
-          s.operationName shouldBe "/nested/{param1}/with/{param2}/mixed/{param3}/types"
-        }
+        val span = testSpanReporter().nextSpan().value
+        span.operationName shouldBe "/nested/{integer_param}/with/{param2}/mixed/{other_param}/types"
       }
     }
   }

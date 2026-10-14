@@ -141,8 +141,12 @@ class ActorMetricsSpec extends TestKit(ActorSystem("ActorMetricsSpec")) with Any
       initialiseListener.expectMsg(Pong)
 
       // Cleanup all the metric recording instruments:
-      if(resetState) {
+      if (resetState) {
         val tags = actorTags(s"ActorMetricsSpec/user/$name")
+
+        eventually(timeout(2 seconds)) {
+          ActorTimeInMailbox.withTags(tags).distribution().count should be >= 1L
+        }
 
         ActorTimeInMailbox.withTags(tags).distribution(resetState = true)
         ActorProcessingTime.withTags(tags).distribution(resetState = true)

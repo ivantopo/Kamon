@@ -19,6 +19,7 @@ package kamon.instrumentation.tapir
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 
+import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -29,10 +30,12 @@ object TapirAkkaHttpServer {
 
   private var server: Future[Http.ServerBinding] = _
 
-  def start = {
-    server = Http().newServerAt("localhost", 8080).bindFlow(TestRoutes.routes)
+  def start(): Int = {
+    server = Http().bindAndHandle(AkkaHttpTestRoutes.routes, "localhost", 0)
+    val binding = Await.result(server, 10 seconds)
+    binding.localAddress.getPort()
   }
 
-  def stop = server.flatMap(x => x.terminate(5.seconds))
+  def stop() = server.flatMap(x => x.unbind())
 
 }

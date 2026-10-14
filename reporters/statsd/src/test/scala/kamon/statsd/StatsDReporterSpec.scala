@@ -56,7 +56,7 @@ class StatsDReporterSpec extends AnyWordSpec with Matchers with BeforeAndAfter w
         |
       """.stripMargin
   )
-  val metricKeyGenerator = new SimpleMetricKeyGenerator(config.getConfig("kamon.statsd"))
+  def metricKeyGenerator = new SimpleMetricKeyGenerator(config.getConfig("kamon.statsd"))
   val testConfig: Config = ConfigFactory.load(config).withFallback(ConfigFactory.load())
   val statsDReporter = new TestStatsDReporter()
   var moduleRegistration: Registration = _

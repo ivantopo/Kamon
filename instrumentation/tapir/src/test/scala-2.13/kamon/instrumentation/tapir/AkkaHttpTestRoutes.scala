@@ -23,7 +23,7 @@ import sttp.tapir.{endpoint, path, plainBody}
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object TestRoutes {
+object AkkaHttpTestRoutes {
 
   // hello/{}
   private val hello = endpoint.get

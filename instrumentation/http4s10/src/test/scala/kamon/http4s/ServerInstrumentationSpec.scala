@@ -34,6 +34,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.time.SpanSugar
 import org.scalatest.OptionValues
 import org.typelevel.ci.CIString
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -44,7 +45,13 @@ class ServerInstrumentationSpec
     with SpanSugar
     with OptionValues
     with TestSpanReporter
+    with BeforeAndAfterEach
     with InitAndStopKamonAfterAll {
+
+  override protected def beforeEach(): Unit = {
+    testSpanReporter().clear()
+    super.beforeEach()
+  }
 
   val srv =
     BlazeServerBuilder[IO](global.compute)
