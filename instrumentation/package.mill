@@ -52,23 +52,11 @@ trait GrpcTests extends ScalaPBModule { self: KamonModule#CrossSbtTests =>
 
 /** Java-only annotation API module - no Scala dependency */
 object annotationApi extends annotationApi
-trait annotationApi extends JavaModule with SonatypeCentralPublishModule {
+trait annotationApi extends JavaModule with KamonPublishModule {
 
   override def artifactName = "kamon-annotation-api"
 
-  def publishVersion: T[String] = kamonVersion
-
-  def pomSettings = PomSettings(
-    description = "Kamon Annotation API",
-    organization = "io.kamon",
-    url = "https://kamon.io",
-    licenses = Seq(License.`Apache-2.0`),
-    versionControl = VersionControl.github("kamon-io", "Kamon"),
-    developers = Seq(
-      Developer("Ivan", "Topolnjak", "https://github.com/ivantopo"),
-      Developer("Diego", "Parra", "https://github.com/dpsoft")
-    )
-  )
+  override def publishDescription = "Kamon Annotation API"
 
   def javacOptions = CommonJavacOptions ++ Seq("-Xdoclint:none")
   override def javadocOptions = Seq("-Xdoclint:none")
@@ -81,18 +69,13 @@ trait annotation extends KamonModule {
 
   def moduleDeps = Seq(core.core(crossValue), annotationApi)
 
-  def compileMvnDeps = Seq(
-    Deps.kanelaAgent
-  )
+  def compileMvnDeps = Seq(Deps.kanelaAgent) ++ shadedMvnDeps
 
   // Dependencies to shade
   def shadedMvnDeps = Seq(
     Deps.caffeine,
     Deps.glassfishEl
   )
-
-  // Make shaded deps available at compile time
-  override def mandatoryMvnDeps = super.mandatoryMvnDeps() ++ shadedMvnDeps
 
   // Shading rules
   override def shadingRules = super.shadingRules ++ Seq(
@@ -113,7 +96,7 @@ trait annotation extends KamonModule {
     def mvnDeps = Seq(
       Deps.scalatest,
       Deps.logbackClassic
-    )
+    ) ++ shadedMvnDeps
   }
 }
 

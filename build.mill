@@ -37,22 +37,10 @@ def publishedModules: Seq[PublishModule] = {
   roots.flatMap(collectPublishModules)
 }
 
-object bom extends BomModule with SonatypeCentralPublishModule {
+object bom extends BomModule with KamonPublishModule {
   override def artifactName = "kamon-bom"
 
-  def publishVersion: T[String] = kamonVersion
-
-  def pomSettings = PomSettings(
-    description = "Kamon Bill of Materials (BOM)",
-    organization = "io.kamon",
-    url = "https://kamon.io",
-    licenses = Seq(License.`Apache-2.0`),
-    versionControl = VersionControl.github("kamon-io", "Kamon"),
-    developers = Seq(
-      Developer("Ivan", "Topolnjak", "https://github.com/ivantopo"),
-      Developer("Diego", "Parra", "https://github.com/dpsoft")
-    )
-  )
+  override def publishDescription = "Kamon Bill of Materials (BOM)"
 
   override def publishXmlDepMgmt: Task[Seq[mill.javalib.publish.Dependency]] = Task.Anon {
     val artifacts = Task.traverse(publishedModules)(_.artifactMetadata)()
@@ -389,7 +377,26 @@ object Deps {
 
 def CommonJavacOptions = Seq("--release", "8", "-encoding", "UTF-8")
 
-trait KamonModule extends CrossSbtModule with SonatypeCentralPublishModule  {
+/** Publishing metadata shared by Scala modules, Java modules, and the BOM. */
+trait KamonPublishModule extends SonatypeCentralPublishModule {
+  def publishDescription: String = "Kamon - Monitoring and Instrumentation for the JVM"
+
+  def publishVersion: T[String] = kamonVersion
+
+  def pomSettings = PomSettings(
+    description = publishDescription,
+    organization = "io.kamon",
+    url = "https://kamon.io",
+    licenses = Seq(License.`Apache-2.0`),
+    versionControl = VersionControl.github("kamon-io", "Kamon"),
+    developers = Seq(
+      Developer("Ivan", "Topolnjak", "https://github.com/ivantopo"),
+      Developer("Diego", "Parra", "https://github.com/dpsoft")
+    )
+  )
+}
+
+trait KamonModule extends CrossSbtModule with KamonPublishModule {
 
   def javacOptions = CommonJavacOptions
 
@@ -412,20 +419,6 @@ trait KamonModule extends CrossSbtModule with SonatypeCentralPublishModule  {
     val crossScalaVersionSettings = if(crossValue == Scala2Version) scala2Settings else scala3Settings
     commonSettings ++ crossScalaVersionSettings
   }
-
-  def publishVersion: T[String] = kamonVersion
-
-  def pomSettings = PomSettings(
-    description = "Kamon - Monitoring and Instrumentation for the JVM",
-    organization = "io.kamon",
-    url = "https://kamon.io",
-    licenses = Seq(License.`Apache-2.0`),
-    versionControl = VersionControl.github("kamon-io", "Kamon"),
-    developers = Seq(
-      Developer("Ivan", "Topolnjak", "https://github.com/ivantopo"),
-      Developer("Diego", "Parra", "https://github.com/dpsoft")
-    )
-  )
 
   /** Dependencies to be shaded (included) in the jar */
   def shadedMvnDeps: Seq[Dep] = Seq.empty
